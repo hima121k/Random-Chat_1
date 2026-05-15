@@ -25,29 +25,10 @@ export const onReportCreated = functions.firestore
       return;
     }
 
-    const reportsSnap = await db
-      .collection('reports')
-      .where('reportedId', '==', reportedId)
-      .count()
-      .get();
-
-    const count = reportsSnap.data().count;
-    functions.logger.info(`User ${reportedId} has ${count} reports`);
-
-    if (count >= REPORT_THRESHOLD) {
-      const banRef = db.collection('banned_users').doc(reportedId);
-      const banSnap = await banRef.get();
-
-      if (!banSnap.exists) {
-        await banRef.set({
-          userId: reportedId,
-          bannedAt: admin.firestore.FieldValue.serverTimestamp(),
-          reason: `Auto-banned after ${count} reports`,
-          reportCount: count,
-        });
-        functions.logger.info(`User ${reportedId} has been auto-banned (${count} reports)`);
-      }
-    }
+    // Auto-ban logic is handled client-side in admin.ts with deduplication
+    // and role-aware thresholds. This function is kept as a hook for future
+    // server-side moderation (e.g., AI content analysis).
+    functions.logger.info(`New report created for user ${reportedId}`);
   });
 
 /**

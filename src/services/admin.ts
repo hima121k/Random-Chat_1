@@ -1,5 +1,6 @@
 import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, updateDoc, onSnapshot, query, orderBy, where, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
+import type { User } from 'firebase/auth';
 
 export type Role = 'owner' | 'admin' | 'user';
 export type ReportStatus = 'pending' | 'actioned' | 'dismissed';
@@ -320,6 +321,11 @@ export const submitReport = async (
 ) => {
   if (!db || !auth?.currentUser) return;
   const reporterId = auth.currentUser.uid;
+
+  // Prevent self-reporting
+  if (reportedId === reporterId) {
+    throw new Error('You cannot report yourself.');
+  }
 
   // DUPLICATE CHECK: one report per reporter per chat session
   const alreadyReported = await getDocs(
@@ -682,8 +688,8 @@ export const subscribeToUserSubscription = (userId: string, callback: (sub: User
     return onSnapshot(doc(db, 'users', userId), (doc) => {
       if (doc.exists()) {
         const data = doc.data();
-        // If staff, keep it staff, else use doc data
-        getUserRole(currentUser?.email).then(role => {
+        // Use live auth reference to avoid stale closure
+        getUserRole(auth?.currentUser?.email).then(role => {
           if (role === 'owner' || role === 'admin') {
             callback({ isPro: true, status: 'Permanent (Staff)' });
           } else {
@@ -696,8 +702,8 @@ export const subscribeToUserSubscription = (userId: string, callback: (sub: User
           }
         });
       } else {
-        // Even if no doc, staff get pro
-        getUserRole(currentUser?.email).then(role => {
+        // Even if no doc, staff get pro — use live auth reference
+        getUserRole(auth?.currentUser?.email).then(role => {
           if (role === 'owner' || role === 'admin') {
             callback({ isPro: true, status: 'Permanent (Staff)' });
           } else {

@@ -54,6 +54,7 @@ export default function Chat() {
   const myKeyPairRef = useRef<CryptoKeyPair | null>(null)
   const sharedKeyRef = useRef<CryptoKey | null>(null)
   const [e2eeReady, setE2eeReady] = useState(false)
+  const [isE2eeActive, setIsE2eeActive] = useState(false) // true only when actual E2EE key is derived
   const [keyVersion, setKeyVersion] = useState(0)
 
   // Video Call
@@ -71,6 +72,7 @@ export default function Chat() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const isLeavingRef = useRef(false)
+  const strangerUnsubRef = useRef<(() => void) | null>(null) // ref for stranger listener cleanup
   // Derive safe (non-null) refs for db and auth — both are guaranteed to be set
   // when Firebase env vars are present (App.tsx gates rendering on isEnvConfigured).
   const currentUserId = auth?.currentUser?.uid
@@ -111,6 +113,7 @@ export default function Chat() {
             setKeyVersion(v => v + 1)
             clearTimeout(fallbackTimer)
             setE2eeReady(true)
+            setIsE2eeActive(true) // E2EE actually established
           } catch (err) {
             console.warn('Key derivation failed:', err)
           }
@@ -164,9 +167,11 @@ export default function Chat() {
 
       if (docSnapshot.exists()) {
         const data = docSnapshot.data()
-        if (data.users && currentUserId) {
+        if (data.participants && data.users && currentUserId) {
           const otherId = data.participants.find((id: string) => id !== currentUserId)
           if (otherId && !strangerData) {
+            // Clean up previous stranger listener if any
+            strangerUnsubRef.current?.()
             // Fetch stranger's profile in real-time to ensure badges are accurate
             const unsubStranger = onSnap(doc(db, 'users', otherId), (userSnap) => {
               if (userSnap.exists()) {
@@ -184,9 +189,7 @@ export default function Chat() {
                 setStrangerData({ id: otherId, ...data.users[otherId] });
               }
             });
-            // Attach stranger cleanup to a ref or external state? 
-            // Actually, we can just return it from here if we refactor.
-            (window as any)._unsubStranger = unsubStranger;
+            strangerUnsubRef.current = unsubStranger;
           }
         }
         if (data.videoCall) {
@@ -203,7 +206,8 @@ export default function Chat() {
 
     return () => { 
       unsubChatSnap();
-      if ((window as any)._unsubStranger) (window as any)._unsubStranger();
+      strangerUnsubRef.current?.();
+      strangerUnsubRef.current = null;
     }
   }, [chatId, currentUserId, navigate])
 
@@ -488,9 +492,13 @@ export default function Chat() {
               )}
             </h2>
             <p className="text-[11px] flex items-center gap-1">
-              {e2eeReady ? (
+              {isE2eeActive ? (
                 <span className="text-emerald-400 flex items-center gap-1">
                   <Lock size={9} /> End-to-end encrypted
+                </span>
+              ) : e2eeReady ? (
+                <span className="text-amber-400 flex items-center gap-1">
+                  <Lock size={9} /> Unencrypted mode
                 </span>
               ) : (
                 <span className="text-yellow-400 flex items-center gap-1">
@@ -523,10 +531,18 @@ export default function Chat() {
           </span>
         </div>
 
-        {e2eeReady && (
+        {isE2eeActive && (
           <div className="text-center my-2">
             <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400/80 bg-emerald-500/8 border border-emerald-500/15 px-3 py-1 rounded-full">
               <Lock size={9} /> Messages are end-to-end encrypted
+            </span>
+          </div>
+        )}
+
+        {e2eeReady && !isE2eeActive && (
+          <div className="text-center my-2">
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-amber-400/80 bg-amber-500/8 border border-amber-500/15 px-3 py-1 rounded-full">
+              <Lock size={9} /> Messages are not encrypted in this session
             </span>
           </div>
         )}

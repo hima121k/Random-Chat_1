@@ -37,6 +37,7 @@ export const VideoCall: React.FC<VideoCallProps> = ({ chatId, isCaller, onHangup
 
   useEffect(() => {
     let mounted = true;
+    const unsubscribers: (() => void)[] = []; // Track all onSnapshot listeners for cleanup
 
     const setupWebRTC = async () => {
       pc.current = new RTCPeerConnection(servers);
@@ -101,14 +102,14 @@ export const VideoCall: React.FC<VideoCallProps> = ({ chatId, isCaller, onHangup
           await updateDoc(chatDoc, { offer });
         }
 
-        onSnapshot(chatDoc, async (snapshot) => {
+        const unsubChatDoc = onSnapshot(chatDoc, async (snapshot) => {
           const data = snapshot.data();
           if (!pc.current?.currentRemoteDescription && data?.answer) {
             const answerDescription = new RTCSessionDescription(data.answer);
             await pc.current?.setRemoteDescription(answerDescription);
 
             // Listen to candidates ONLY AFTER remote description is set
-            onSnapshot(calleeCandidatesCollection, (candidateSnapshot) => {
+            const unsubCalleeCandidates = onSnapshot(calleeCandidatesCollection, (candidateSnapshot) => {
               candidateSnapshot.docChanges().forEach((change) => {
                 if (change.type === 'added') {
                   const candidate = new RTCIceCandidate(change.doc.data());
@@ -116,8 +117,10 @@ export const VideoCall: React.FC<VideoCallProps> = ({ chatId, isCaller, onHangup
                 }
               });
             });
+            unsubscribers.push(unsubCalleeCandidates);
           }
         });
+        unsubscribers.push(unsubChatDoc);
 
       } else {
         pc.current.onicecandidate = (event) => {
@@ -134,13 +137,14 @@ export const VideoCall: React.FC<VideoCallProps> = ({ chatId, isCaller, onHangup
               unsub();
             }
           });
+          unsubscribers.push(unsub);
         });
 
         const offerDescription = new RTCSessionDescription(chatData.offer as RTCSessionDescriptionInit);
         await pc.current?.setRemoteDescription(offerDescription);
 
-        // Fix #5: subscribe to caller candidates AFTER setRemoteDescription
-        onSnapshot(callerCandidatesCollection, (snapshot) => {
+        // Subscribe to caller candidates AFTER setRemoteDescription
+        const unsubCallerCandidates = onSnapshot(callerCandidatesCollection, (snapshot) => {
           snapshot.docChanges().forEach((change) => {
             if (change.type === 'added') {
               const candidate = new RTCIceCandidate(change.doc.data());
@@ -148,6 +152,7 @@ export const VideoCall: React.FC<VideoCallProps> = ({ chatId, isCaller, onHangup
             }
           });
         });
+        unsubscribers.push(unsubCallerCandidates);
 
         const answerDescription = await pc.current?.createAnswer();
         if (answerDescription) {
@@ -167,7 +172,9 @@ export const VideoCall: React.FC<VideoCallProps> = ({ chatId, isCaller, onHangup
 
     return () => {
       mounted = false;
-      localStreamRef.current?.getTracks().forEach(track => track.stop()); // Fix #4: use ref
+      // Clean up all Firestore snapshot listeners
+      unsubscribers.forEach(unsub => unsub());
+      localStreamRef.current?.getTracks().forEach(track => track.stop());
       if (pc.current) {
         pc.current.close();
       }
