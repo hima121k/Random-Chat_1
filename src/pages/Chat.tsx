@@ -70,12 +70,20 @@ export default function Chat() {
   const [isReporting, setIsReporting] = useState(false)
   const [reportError, setReportError] = useState('')
 
-  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [isLeaving, setIsLeaving] = useState(false)
   const isLeavingRef = useRef(false)
-  const strangerUnsubRef = useRef<(() => void) | null>(null) // ref for stranger listener cleanup
-  // Derive safe (non-null) refs for db and auth — both are guaranteed to be set
-  // when Firebase env vars are present (App.tsx gates rendering on isEnvConfigured).
-  const currentUserId = auth?.currentUser?.uid
+  const strangerUnsubRef = useRef<(() => void) | null>(null)
+  
+  const [currentUser, setCurrentUser] = useState<User | null>(auth?.currentUser || null)
+  const [isAuthLoading, setIsAuthLoading] = useState(!auth?.currentUser)
+  const currentUserId = currentUser?.uid
+
+  useEffect(() => {
+    return onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user)
+      setIsAuthLoading(false)
+    })
+  }, [])
 
   // ── E2EE setup (with fallback if Firestore rules block key exchange) ─────
   useEffect(() => {
@@ -157,6 +165,7 @@ export default function Chat() {
       sessionStorage.removeItem('valid_chat_navigation')
     }
 
+    if (isAuthLoading) return;
     if (!currentUserId) { navigate('/'); return }
 
     const chatRef = doc(db, 'chats', chatId)
@@ -346,6 +355,14 @@ export default function Chat() {
     if (gender === 'female') return 'text-pink-400 bg-pink-500/10 border-pink-500/20'
     if (gender === 'male') return 'text-blue-400 bg-blue-500/10 border-blue-500/20'
     return 'text-rc-accentGlow bg-rc-accent/10 border-rc-accent/20'
+  }
+
+  if (isAuthLoading) {
+    return (
+      <div className="flex-1 flex items-center justify-center bg-rc-bg">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-rc-accent shadow-glow"></div>
+      </div>
+    )
   }
 
   return (

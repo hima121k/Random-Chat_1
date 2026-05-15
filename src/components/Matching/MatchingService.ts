@@ -63,11 +63,13 @@ export const MatchingService = {
       let unsubscribe = () => { };
 
       const querySnapshot = await getDocs(q);
+      const blockedUsers = JSON.parse(localStorage.getItem('blockedUsers') || '[]');
 
       // Filter and sort waiting users
       const sortedDocs = querySnapshot.docs.filter(docSnap => {
         const wu = docSnap.data();
         if (wu.userId === userId) return false;
+        if (blockedUsers.includes(wu.userId)) return false; // Don't match with blocked users
 
         // Compatibility Check (Pro Feature)
         const myMatchGender = userData.matchGender || 'any';

@@ -1,4 +1,4 @@
-import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, updateDoc, onSnapshot, query, orderBy, where, addDoc, serverTimestamp, Timestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, collection, getDocs, updateDoc, onSnapshot, query, orderBy, where, addDoc, serverTimestamp, Timestamp, limit } from 'firebase/firestore';
 import { db, auth } from '../lib/firebase';
 import type { User } from 'firebase/auth';
 
@@ -275,7 +275,7 @@ export const clearAllReports = async () => {
   let deleted = 0;
   let hasMore = true;
   while (hasMore) {
-    const snap = await getDocs(query(collection(db, 'reports'), orderBy('timestamp', 'desc')));
+    const snap = await getDocs(query(collection(db, 'reports'), orderBy('timestamp', 'desc'), limit(400)));
     if (snap.empty) { hasMore = false; break; }
     const batch = (await import('firebase/firestore')).writeBatch(db);
     snap.docs.slice(0, 400).forEach(d => batch.delete(d.ref));
@@ -501,7 +501,7 @@ export const subscribeToBannedUsers = (callback: (users: BannedUser[]) => void) 
   if (!db) return () => { };
   try {
     return onSnapshot(collection(db, 'banned_users'), (snap) => {
-      callback(snap.docs.map(d => ({ ...d.data() } as BannedUser)));
+      callback(snap.docs.map(d => ({ userId: d.id, ...d.data() } as BannedUser)));
     }, (err) => {
       console.warn('Failed to subscribe to banned users:', err.message);
       callback([]);

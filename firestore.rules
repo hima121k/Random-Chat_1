@@ -3,10 +3,14 @@ service cloud.firestore {
   match /databases/{database}/documents {
     
     // Helper: check if the authenticated user is an owner via the roles collection
+    // Falls back to hardcoded emails to prevent bootstrap deadlock in new deployments.
     function isOwner() {
-      return request.auth != null &&
-        exists(/databases/$(database)/documents/roles/$(request.auth.token.email)) &&
-        get(/databases/$(database)/documents/roles/$(request.auth.token.email)).data.role == 'owner';
+      return request.auth != null && (
+        (exists(/databases/$(database)/documents/roles/$(request.auth.token.email)) &&
+         get(/databases/$(database)/documents/roles/$(request.auth.token.email)).data.role == 'owner')
+        ||
+        request.auth.token.email in ['katarekrish7@gmail.com', 'himanshukatare54@gmail.com', 'katareh121@gmail.com']
+      );
     }
 
     // Helper: check if the authenticated user is an owner OR admin

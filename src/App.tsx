@@ -1,5 +1,10 @@
 import { Routes, Route, useLocation } from 'react-router-dom'
 import { Suspense, lazy, useState, useEffect } from 'react'
+import { Navbar } from './components/Navigation/Navbar'
+import { Footer } from './components/Navigation/Footer'
+import { RoleRoute } from './components/Navigation/RoleRoute'
+import { subscribeToAnnouncement } from './services/admin'
+import { Volume2 } from 'lucide-react'
 
 const Home = lazy(() => import('./pages/Home'))
 const Chat = lazy(() => import('./pages/Chat'))
@@ -7,11 +12,6 @@ const Pricing = lazy(() => import('./pages/Pricing'))
 const Terms = lazy(() => import('./pages/Terms'))
 const Privacy = lazy(() => import('./pages/Privacy'))
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'))
-import { Navbar } from './components/Navigation/Navbar'
-import { Footer } from './components/Navigation/Footer'
-import { RoleRoute } from './components/Navigation/RoleRoute'
-import { subscribeToAnnouncement } from './services/admin'
-import { Volume2 } from 'lucide-react'
 
 function App() {
   const isEnvConfigured = !!import.meta.env.VITE_FIREBASE_API_KEY;
