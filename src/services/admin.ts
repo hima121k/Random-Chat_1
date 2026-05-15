@@ -193,14 +193,14 @@ export const subscribeToPlatformMetrics = (callback: (metrics: { activeChats: nu
       activeChats = snap.docs.filter(doc => doc.data().status === 'active').length;
       notify();
     }, (err) => {
-      console.warn('Failed to subscribe to chats metric:', err);
+      console.warn('Failed to subscribe to chats metric:', err.message);
     });
 
     const unsubWaiting = onSnapshot(collection(db, 'waiting_room'), (snap) => {
       waitingUsers = snap.docs.filter(doc => doc.data().status === 'waiting').length;
       notify();
     }, (err) => {
-      console.warn('Failed to subscribe to waiting metric:', err);
+      console.warn('Failed to subscribe to waiting metric:', err.message);
     });
 
     return () => {
@@ -273,15 +273,15 @@ export const clearAllReports = async () => {
 
   // Delete in batches of 400
   let deleted = 0;
-  let hasMore = true;
-  while (hasMore) {
+  while (true) {
     const snap = await getDocs(query(collection(db, 'reports'), orderBy('timestamp', 'desc'), limit(400)));
-    if (snap.empty) { hasMore = false; break; }
-    const batch = (await import('firebase/firestore')).writeBatch(db);
-    snap.docs.slice(0, 400).forEach(d => batch.delete(d.ref));
+    if (snap.empty) break;
+    const { writeBatch } = await import('firebase/firestore');
+    const batch = writeBatch(db);
+    snap.docs.forEach(d => batch.delete(d.ref));
     await batch.commit();
-    deleted += snap.docs.slice(0, 400).length;
-    if (snap.docs.length < 400) hasMore = false;
+    deleted += snap.docs.length;
+    if (snap.docs.length < 400) break;
   }
   return deleted;
 };
@@ -424,10 +424,11 @@ export const subscribeToPendingReports = (callback: (reports: Report[]) => void)
     return onSnapshot(q, (snap) => {
       callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as Report)));
     }, (err) => {
-      console.warn('Failed to subscribe to reports:', err.message);
+      console.error('Failed to subscribe to pending reports:', err.message);
       callback([]);
     });
   } catch (err) {
+    console.error('Pending reports subscription init failed:', err);
     return () => { };
   }
 };
@@ -439,10 +440,11 @@ export const subscribeToAllReports = (callback: (reports: Report[]) => void) => 
     return onSnapshot(q, (snap) => {
       callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as Report)));
     }, (err) => {
-      console.warn('Failed to subscribe to all reports:', err.message);
+      console.error('Failed to subscribe to all reports:', err.message);
       callback([]);
     });
   } catch (err) {
+    console.error('All reports subscription init failed:', err);
     return () => { };
   }
 };
@@ -503,10 +505,11 @@ export const subscribeToBannedUsers = (callback: (users: BannedUser[]) => void) 
     return onSnapshot(collection(db, 'banned_users'), (snap) => {
       callback(snap.docs.map(d => ({ userId: d.id, ...d.data() } as BannedUser)));
     }, (err) => {
-      console.warn('Failed to subscribe to banned users:', err.message);
+      console.error('Failed to subscribe to banned users:', err.message);
       callback([]);
     });
   } catch (err) {
+    console.error('Banned users subscription init failed:', err);
     return () => { };
   }
 };
@@ -602,7 +605,10 @@ export const subscribeToAppeals = (callback: (appeals: BanAppeal[]) => void) => 
       console.warn('Failed to subscribe to appeals:', err.message);
       callback([]);
     });
-  } catch { return () => { }; }
+  } catch (err) {
+    console.error("Appeals subscription failed:", err);
+    return () => { };
+  }
 };
 
 export const approveAppeal = async (appealId: string, userId: string) => {
@@ -726,12 +732,13 @@ export const subscribeToProUsers = (callback: (users: { uid: string; email?: str
   try {
     const q = query(collection(db, 'users'), where('isPro', '==', true));
     return onSnapshot(q, (snap) => {
-      callback(snap.docs.map(d => ({ uid: d.id, ...d.data() } as any)));
+      callback(snap.docs.map(d => ({ uid: d.id, ...d.data() } as { uid: string; email?: string; name?: string; isPro: boolean; status?: string })));
     }, (err) => {
-      console.warn('Failed to subscribe to pro users:', err.message);
+      console.error('Failed to subscribe to pro users:', err.message);
       callback([]);
     });
   } catch (err) {
+    console.error('Pro users subscription init failed:', err);
     return () => { };
   }
 };
@@ -777,10 +784,11 @@ export const subscribeToCoupons = (callback: (coupons: Coupon[]) => void) => {
     return onSnapshot(q, (snap) => {
       callback(snap.docs.map(d => ({ id: d.id, ...d.data() } as Coupon)));
     }, (err) => {
-      console.warn('Failed to subscribe to coupons:', err.message);
+      console.error('Failed to subscribe to coupons:', err.message);
       callback([]);
     });
   } catch (err) {
+    console.error('Coupons subscription init failed:', err);
     return () => { };
   }
 };

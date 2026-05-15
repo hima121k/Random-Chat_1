@@ -179,7 +179,6 @@ export const VideoCall: React.FC<VideoCallProps> = ({ chatId, isCaller, onHangup
         pc.current.close();
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatId, isCaller]);
 
   useEffect(() => {

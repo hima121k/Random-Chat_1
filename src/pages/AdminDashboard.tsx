@@ -6,7 +6,7 @@ import {
   publishAnnouncement, clearAnnouncement,
   subscribeToPlatformMetrics, subscribeToPendingReports, subscribeToAllReports,
   subscribeToBannedUsers, dismissReport, actionReportBan,
-  manualBanUser, unbanUser, lookupUidByEmail, clearAllReports, deleteReport, deleteAllReportsForUser,
+  manualBanUser, unbanUser, clearAllReports, deleteReport, deleteAllReportsForUser,
   subscribeToAppeals, approveAppeal, denyAppeal,
   subscribeToProUsers, updateUserSubscription, updateUserSubscriptionByEmail,
   subscribeToCoupons, createCoupon, deleteCoupon, type Coupon,
@@ -50,6 +50,10 @@ export default function AdminDashboard() {
   const [banReason, setBanReason] = useState('');
   const [banPermanent, setBanPermanent] = useState(false);
 
+  const fetchAdmins = async () => {
+    try { setAdmins(await getAllAdmins()); } catch (err) { console.error(err); }
+  };
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -79,10 +83,6 @@ export default function AdminDashboard() {
     };
   }, []);
 
-  const fetchAdmins = async () => {
-    try { setAdmins(await getAllAdmins()); } catch (err) { console.error(err); }
-  };
-
   const showMsg = (msg: string, isError = false) => {
     if (isError) setError(msg); else setSuccess(msg);
     setTimeout(() => { setError(null); setSuccess(null); }, 3500);
@@ -94,20 +94,20 @@ export default function AdminDashboard() {
     if (!announcement.trim()) return;
     setIsLoading(true);
     try { await publishAnnouncement(announcement.trim()); showMsg('Announcement published!'); setAnnouncement(''); }
-    catch (err: any) { showMsg(err.message || 'Failed', true); }
+    catch (err: unknown) { showMsg((err as Error).message || 'Failed', true); }
     finally { setIsLoading(false); }
   };
   const handleClear = async () => {
     setIsLoading(true);
     try { await clearAnnouncement(); showMsg('Announcement cleared!'); }
-    catch (err: any) { showMsg(err.message || 'Failed', true); }
+    catch (err: unknown) { showMsg((err as Error).message || 'Failed', true); }
     finally { setIsLoading(false); }
   };
 
   // ── Report handlers ──
   const handleDismiss = async (reportId: string) => {
     try { await dismissReport(reportId); showMsg('Report dismissed.'); }
-    catch (err: any) { showMsg(err.message || 'Failed', true); }
+    catch (err: unknown) { showMsg((err as Error).message || 'Failed', true); }
   };
   const handleBanFromReport = async (report: Report, permanent: boolean) => {
     if (!confirm(`${permanent ? 'Permanently' : 'Temporarily (7 days)'} ban ${report.reportedName}?`)) return;
@@ -135,7 +135,7 @@ export default function AdminDashboard() {
   const handleUnban = async (userId: string, name: string) => {
     if (!confirm(`Unban ${name || userId}?`)) return;
     try { await unbanUser(userId); showMsg(`${name || userId} has been unbanned.`); }
-    catch (err: any) { showMsg(err.message || 'Failed', true); }
+    catch (err: unknown) { showMsg((err as Error).message || 'Failed', true); }
   };
 
   // ── Clear all reports ──
@@ -153,7 +153,7 @@ export default function AdminDashboard() {
   const handleDeleteReport = async (reportId: string) => {
     if (!confirm('Delete this report permanently?')) return;
     try { await deleteReport(reportId); showMsg('Report deleted.'); }
-    catch (err: any) { showMsg(err.message || 'Failed', true); }
+    catch (err: unknown) { showMsg((err as Error).message || 'Failed', true); }
   };
 
   // ── Delete all reports for one user ──
@@ -171,24 +171,18 @@ export default function AdminDashboard() {
     if (!newAdminEmail.trim()) return;
     setIsLoading(true);
     try { await grantAdmin(newAdminEmail.trim()); showMsg(`Admin granted to ${newAdminEmail}.`); setNewAdminEmail(''); fetchAdmins(); }
-    catch (err: any) { showMsg(err.message || 'Failed', true); }
+    catch (err: unknown) { showMsg((err as Error).message || 'Failed', true); }
     finally { setIsLoading(false); }
   };
   const handleRevokeAdmin = async (email: string) => {
     if (!confirm(`Revoke admin rights from ${email}?`)) return;
     try { await revokeAdmin(email); showMsg(`Admin revoked from ${email}.`); fetchAdmins(); }
-    catch (err: any) { showMsg(err.message || 'Failed', true); }
+    catch (err: unknown) { showMsg((err as Error).message || 'Failed', true); }
   };
 
   // ── Pro Management ──
-  const handleTogglePro = async (uid: string, currentStatus: boolean, email?: string) => {
-    const action = currentStatus ? 'Revoke' : 'Grant';
-    if (!confirm(`${action} Pro status for ${email || uid}?`)) return;
-    try {
-      await updateUserSubscription(uid, !currentStatus);
-      showMsg(`Pro status ${currentStatus ? 'revoked' : 'granted'}.`);
-    } catch (err: any) {
-      showMsg(err.message || 'Failed', true);
+    } catch (err: unknown) {
+      showMsg((err as Error).message || 'Failed', true);
     }
   };
 
@@ -205,8 +199,8 @@ export default function AdminDashboard() {
       }
       showMsg(`Pro status granted manually to ${target}.`);
       setProSearchUid(''); setProSearchEmail('');
-    } catch (err: any) {
-      showMsg(err.message || 'Failed', true);
+    } catch (err: unknown) {
+      showMsg((err as Error).message || 'Failed', true);
     } finally {
       setIsLoading(false);
     }
@@ -227,8 +221,8 @@ export default function AdminDashboard() {
       });
       showMsg('Coupon created successfully!');
       setCpCode(''); setCpExpiry('');
-    } catch (err: any) {
-      showMsg(err.message || 'Failed', true);
+    } catch (err: unknown) {
+      showMsg((err as Error).message || 'Failed', true);
     } finally {
       setIsLoading(false);
     }
@@ -239,14 +233,14 @@ export default function AdminDashboard() {
     try {
       await deleteCoupon(id);
       showMsg('Coupon deleted.');
-    } catch (err: any) {
-      showMsg(err.message || 'Failed', true);
+    } catch (err: unknown) {
+      showMsg((err as Error).message || 'Failed', true);
     }
   };
 
-  const formatDate = (ts: any) => {
+  const formatDate = (ts: Timestamp | Date | null) => {
     if (!ts) return 'Unknown';
-    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    const d = ts instanceof Timestamp ? ts.toDate() : new Date(ts);
     return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 

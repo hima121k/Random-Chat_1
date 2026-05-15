@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
-import { Zap, LogOut, Phone, Sparkles, Shield, Lock, Star } from 'lucide-react'
+import { Zap, Phone, Sparkles, Shield, Lock, Star } from 'lucide-react'
 import { loginWithGoogle, signInWithEmail, createEmailAccount, sendPhoneOTP, auth as _auth } from '../lib/firebase'
 import type { Auth } from 'firebase/auth'
 const auth = _auth as Auth
@@ -245,7 +245,7 @@ export default function Home() {
         setError(msg || 'Failed to connect.'); setIsMatching(false)
       }
     }
-  }, [name, gender, age, avatarUrl, navigate, currentUser])
+  }, [name, gender, age, avatarUrl, navigate, currentUser, matchGender, subscription.isPro])
 
   useEffect(() => {
     // Fix 1: only leave the queue on unmount if we never found a match
@@ -268,19 +268,22 @@ export default function Home() {
     if (currentUser) await MatchingService.leaveQueue(currentUser.uid)
   }
 
-  // ── Step progress indicator ──────────────────────────────────────
-  const StepDot = ({ n, active, done }: { n: number | string; active: boolean; done: boolean }) => (
-    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all ${
-      done    ? 'bg-rc-accent text-white shadow-glowSm' :
-      active  ? 'bg-rc-accent/30 text-rc-accentGlow border border-rc-accent' :
-                'bg-rc-surface text-rc-muted border border-rc-border'
-    }`}>{n}</div>
   )
-  const StepBar = ({ filled }: { filled: boolean }) => (
-    <div className="flex-1 h-0.5 bg-rc-border rounded overflow-hidden">
-      <div className={`h-full bg-rc-accent rounded transition-all duration-500 ${filled ? 'w-full' : 'w-0'}`} />
-    </div>
-  )
+}
+
+// ── Step progress indicator ──────────────────────────────────────
+const StepDot = ({ n, active, done }: { n: number | string; active: boolean; done: boolean }) => (
+  <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm transition-all ${
+    done    ? 'bg-rc-accent text-white shadow-glowSm' :
+    active  ? 'bg-rc-accent/30 text-rc-accentGlow border border-rc-accent' :
+              'bg-rc-surface text-rc-muted border border-rc-border'
+  }`}>{n}</div>
+)
+const StepBar = ({ filled }: { filled: boolean }) => (
+  <div className="flex-1 h-0.5 bg-rc-border rounded overflow-hidden">
+    <div className={`h-full bg-rc-accent rounded transition-all duration-500 ${filled ? 'w-full' : 'w-0'}`} />
+  </div>
+)
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 relative overflow-hidden">

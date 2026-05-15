@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Video, PhoneOff, Phone, Flag, AlertTriangle, Lock, Zap } from 'lucide-react'
 import {
-  collection, query, where, orderBy, onSnapshot, addDoc, getDocs, serverTimestamp,
-  doc, updateDoc, setDoc, getDoc, onSnapshot as onSnap, Timestamp
+  collection, query, orderBy, onSnapshot, addDoc, serverTimestamp,
+  doc, updateDoc, setDoc, onSnapshot as onSnap, Timestamp
 } from 'firebase/firestore'
 import { db as _db, auth as _auth } from '../lib/firebase'
 // App.tsx only renders this page when VITE_FIREBASE_API_KEY is set, so
@@ -70,7 +70,6 @@ export default function Chat() {
   const [isReporting, setIsReporting] = useState(false)
   const [reportError, setReportError] = useState('')
 
-  const [isLeaving, setIsLeaving] = useState(false)
   const isLeavingRef = useRef(false)
   const strangerUnsubRef = useRef<(() => void) | null>(null)
   
@@ -153,7 +152,7 @@ export default function Chat() {
         const unsub = onAuthStateChanged(auth, async (user) => {
           unsub()
           if (user && chatId) {
-            try { await updateDoc(doc(db, 'chats', chatId), { status: 'ended' }) } catch { }
+            try { await updateDoc(doc(db, 'chats', chatId), { status: 'ended' }) } catch (err) { console.error("Failed to end chat on refresh:", err); }
           }
           navigate('/', { replace: true })
         })
@@ -218,7 +217,7 @@ export default function Chat() {
       strangerUnsubRef.current?.();
       strangerUnsubRef.current = null;
     }
-  }, [chatId, currentUserId, navigate])
+  }, [chatId, currentUserId, navigate, isAuthLoading, strangerData])
 
   // Fix: Automatically end chat when navigating away via Navbar or Back button
   // We check window.location to avoid Strict Mode double-mount issues in dev.

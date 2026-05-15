@@ -47,11 +47,10 @@ export default function Pricing() {
         setCouponError('Invalid or expired coupon code.');
         setAppliedCoupon(null);
       }
-    } catch (err) {
+    } catch {
       setCouponError('Failed to validate coupon.');
     } finally {
-      setIsLoading(true); // Wait, I should set it to false
-      setTimeout(() => setIsLoading(false), 500);
+      setIsLoading(false);
     }
   };
 
