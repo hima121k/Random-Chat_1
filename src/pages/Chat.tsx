@@ -1,0 +1,544 @@
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useParams, useNavigate } from 'react-router-dom'
+import { ArrowLeft, Video, PhoneOff, Phone, Flag, AlertTriangle, Lock, Zap } from 'lucide-react'
+import {
+  collection, query, where, orderBy, onSnapshot, addDoc, getDocs, serverTimestamp,
+  doc, updateDoc, setDoc, getDoc, onSnapshot as onSnap, Timestamp
+} from 'firebase/firestore'
+import { db as _db, auth as _auth } from '../lib/firebase'
+// App.tsx only renders this page when VITE_FIREBASE_API_KEY is set, so
+// db and auth are always initialised here. Assert non-null once.
+import type { Firestore } from 'firebase/firestore'
+import type { Auth } from 'firebase/auth'
+import { onAuthStateChanged } from 'firebase/auth'
+const db = _db as Firestore
+const auth = _auth as Auth
+
+import { MessageBubble } from '../components/Chat/MessageBubble'
+import { ChatInput } from '../components/Chat/ChatInput'
+import { VideoCall } from '../components/VideoCall/VideoCall'
+import {
+  generateECDHKeyPair,
+  deriveSharedKey,
+  encryptMessage,
+  decryptMessage,
+  type EncryptedPayload,
+} from '../lib/crypto'
+import { submitReport } from '../services/admin'
+
+interface Message {
+  id: string;
+  text: string;
+  senderId: string;
+  createdAt: Timestamp | null;
+}
+
+interface RawMessage {
+  id: string;
+  ct: string;
+  iv: string;
+  senderId: string;
+  createdAt: Timestamp | null;
+}
+
+let currentChatSessionId: string | null = null;
+
+export default function Chat() {
+  const { chatId } = useParams<{ chatId: string }>()
+  const navigate = useNavigate()
+
+  const [messages, setMessages] = useState<Message[]>([])
+  const [strangerData, setStrangerData] = useState<{ id: string; name: string; gender: string; avatarUrl?: string; role?: string; isPro?: boolean } | null>(null)
+
+  // E2EE
+  const myKeyPairRef = useRef<CryptoKeyPair | null>(null)
+  const sharedKeyRef = useRef<CryptoKey | null>(null)
+  const [e2eeReady, setE2eeReady] = useState(false)
+  const [keyVersion, setKeyVersion] = useState(0)
+
+  // Video Call
+  const [incomingCall, setIncomingCall] = useState(false)
+  const [inCall, setInCall] = useState(false)
+  const [isCaller, setIsCaller] = useState(false)
+
+  // Report/Block
+  const [showReportModal, setShowReportModal] = useState(false)
+  const [reportReason, setReportReason] = useState('')
+  const [reportDescription, setReportDescription] = useState('')
+  const [reportSent, setReportSent] = useState(false)
+  const [isReporting, setIsReporting] = useState(false)
+  const [reportError, setReportError] = useState('')
+
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const isLeavingRef = useRef(false)
+  // Derive safe (non-null) refs for db and auth — both are guaranteed to be set
+  // when Firebase env vars are present (App.tsx gates rendering on isEnvConfigured).
+  const currentUserId = auth?.currentUser?.uid
+
+  // ── E2EE setup (with fallback if Firestore rules block key exchange) ─────
+  useEffect(() => {
+    if (!currentUserId || !chatId) return
+    let cancelled = false
+    let unsubKeys: (() => void) | null = null
+
+    // Timeout: if E2EE doesn't complete in 8 s, allow chat in plaintext mode
+    const fallbackTimer = setTimeout(() => {
+      if (!cancelled && !sharedKeyRef.current) {
+        console.warn('E2EE key exchange timed out — falling back to plaintext mode')
+        setE2eeReady(true) // unblock input; sharedKeyRef stays null → plaintext
+      }
+    }, 8000)
+
+    const initE2EE = async () => {
+      try {
+        const { keyPair, publicKeyB64 } = await generateECDHKeyPair()
+        if (cancelled) return
+        myKeyPairRef.current = keyPair
+
+        // Publish our public key — may fail if Firestore rules aren't deployed yet
+        const keyDocRef = doc(db, 'chats', chatId, 'e2eeKeys', currentUserId)
+        await setDoc(keyDocRef, { publicKey: publicKeyB64, uid: currentUserId })
+
+        const keysRef = collection(db, 'chats', chatId, 'e2eeKeys')
+        unsubKeys = onSnap(keysRef, async (snap) => {
+          if (cancelled) return
+          const peerDoc = snap.docs.find(d => d.id !== currentUserId)
+          if (!peerDoc || !myKeyPairRef.current) return
+          try {
+            const shared = await deriveSharedKey(myKeyPairRef.current.privateKey, peerDoc.data().publicKey)
+            if (cancelled) return
+            sharedKeyRef.current = shared
+            setKeyVersion(v => v + 1)
+            clearTimeout(fallbackTimer)
+            setE2eeReady(true)
+          } catch (err) {
+            console.warn('Key derivation failed:', err)
+          }
+        })
+      } catch (err) {
+        console.warn('E2EE setup failed (likely Firestore rules not deployed):', err)
+        // Fallback: unblock input immediately so users can still chat
+        if (!cancelled) setE2eeReady(true)
+        clearTimeout(fallbackTimer)
+      }
+    }
+
+    initE2EE()
+    return () => {
+      cancelled = true
+      clearTimeout(fallbackTimer)
+      unsubKeys?.()
+    }
+  }, [chatId, currentUserId])
+
+  // ── Chat room ──────────────────────────────────────────
+  useEffect(() => {
+    if (!chatId) { navigate('/'); return }
+
+    if (currentChatSessionId !== chatId) {
+      if (sessionStorage.getItem('valid_chat_navigation') !== 'true') {
+        console.warn('Page refresh detected. Redirecting to home to start a new chat.')
+        // Wait for auth to initialize so we have permissions to end the chat
+        const unsub = onAuthStateChanged(auth, async (user) => {
+          unsub()
+          if (user && chatId) {
+            try { await updateDoc(doc(db, 'chats', chatId), { status: 'ended' }) } catch { }
+          }
+          navigate('/', { replace: true })
+        })
+        // Fallback timeout in case auth hangs
+        setTimeout(() => navigate('/', { replace: true }), 1500)
+        return
+      }
+      currentChatSessionId = chatId
+      sessionStorage.removeItem('valid_chat_navigation')
+    }
+
+    if (!currentUserId) { navigate('/'); return }
+
+    const chatRef = doc(db, 'chats', chatId)
+    // Fix 3: includeMetadataChanges lets us inspect snapshot.metadata.fromCache
+    const unsubChatSnap = onSnapshot(chatRef, { includeMetadataChanges: true }, (docSnapshot) => {
+      // Fix 3: ignore locally-cached snapshots — only act on server-confirmed data
+      if (docSnapshot.metadata.fromCache) return
+
+      if (docSnapshot.exists()) {
+        const data = docSnapshot.data()
+        if (data.users && currentUserId) {
+          const otherId = data.participants.find((id: string) => id !== currentUserId)
+          if (otherId && !strangerData) {
+            // Fetch stranger's profile in real-time to ensure badges are accurate
+            const unsubStranger = onSnap(doc(db, 'users', otherId), (userSnap) => {
+              if (userSnap.exists()) {
+                const userData = userSnap.data();
+                setStrangerData({ 
+                  id: otherId, 
+                  name: data.users[otherId]?.name || 'Stranger',
+                  gender: data.users[otherId]?.gender,
+                  avatarUrl: data.users[otherId]?.avatarUrl,
+                  role: userData.role || 'user',
+                  isPro: userData.isPro || false
+                });
+              } else {
+                // Fallback to chat room data if user doc doesn't exist yet
+                setStrangerData({ id: otherId, ...data.users[otherId] });
+              }
+            });
+            // Attach stranger cleanup to a ref or external state? 
+            // Actually, we can just return it from here if we refactor.
+            (window as any)._unsubStranger = unsubStranger;
+          }
+        }
+        if (data.videoCall) {
+          if (data.videoCall.status === 'ringing' && data.videoCall.callerId !== currentUserId) setIncomingCall(true)
+          else if (data.videoCall.status === 'ended') { setInCall(false); setIncomingCall(false) }
+          else if (data.videoCall.status === 'connected' && data.videoCall.callerId !== currentUserId) setIncomingCall(false)
+        }
+        // Fix 3: only redirect on a server-confirmed ended status
+        if (data.status === 'ended' && !isLeavingRef.current) navigate('/', { state: { autoStart: true } })
+      } else {
+        if (!isLeavingRef.current) navigate('/')
+      }
+    })
+
+    return () => { 
+      unsubChatSnap();
+      if ((window as any)._unsubStranger) (window as any)._unsubStranger();
+    }
+  }, [chatId, currentUserId, navigate])
+
+  // Fix: Automatically end chat when navigating away via Navbar or Back button
+  // We check window.location to avoid Strict Mode double-mount issues in dev.
+  useEffect(() => {
+    return () => {
+      const isStillOnThisChat = window.location.pathname.includes(chatId || '');
+      if (!isLeavingRef.current && chatId && !isStillOnThisChat) {
+        updateDoc(doc(db, 'chats', chatId), { status: 'ended' }).catch(() => {});
+      }
+    }
+  }, [chatId]);
+
+  // ── Messages ──────────────────────────────────────────
+  useEffect(() => {
+    if (!currentUserId || !chatId) return
+
+    const messagesRef = collection(db, 'chats', chatId, 'messages')
+    const q = query(messagesRef, orderBy('createdAt', 'asc'))
+    let mounted = true                                          // Fix #8: unmount guard
+    const unsubMessages = onSnapshot(q, async (snapshot) => {
+      const rawMsgs = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as RawMessage[]
+      const decrypted = await Promise.all(
+        rawMsgs.map(async (raw): Promise<Message> => {
+          // Support both encrypted (ct/iv) and plaintext (text) message formats
+          const hasEncrypted = raw.ct && raw.iv
+          if (!hasEncrypted) {
+            // Plaintext fallback message
+            const anyRaw = raw as unknown as Record<string, unknown>
+            return { id: raw.id, text: (anyRaw.text as string) ?? '', senderId: raw.senderId, createdAt: raw.createdAt }
+          }
+          if (!sharedKeyRef.current)
+            return { id: raw.id, text: '🔒 Decrypting…', senderId: raw.senderId, createdAt: raw.createdAt }
+          const payload: EncryptedPayload = { ct: raw.ct, iv: raw.iv }
+          const plaintext = await decryptMessage(payload, sharedKeyRef.current)
+          return { id: raw.id, text: plaintext ?? '🔒 Encrypted message', senderId: raw.senderId, createdAt: raw.createdAt }
+        })
+      )
+      if (mounted) setMessages(decrypted)                       // Fix #8: guard
+    })
+
+    return () => { mounted = false; unsubMessages() }
+  }, [chatId, currentUserId, keyVersion])
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  // ── Send message (encrypted if key ready, plaintext fallback) ────────────
+  const handleSendMessage = useCallback(async (text: string) => {
+    if (!chatId || !currentUserId || isLeavingRef.current) return
+    if (sharedKeyRef.current) {
+      // Full E2EE path
+      const payload = await encryptMessage(text, sharedKeyRef.current)
+      await addDoc(collection(db, 'chats', chatId, 'messages'), {
+        ct: payload.ct, iv: payload.iv, senderId: currentUserId, createdAt: serverTimestamp()
+      })
+    } else {
+      // Plaintext fallback (E2EE setup failed / timed out)
+      await addDoc(collection(db, 'chats', chatId, 'messages'), {
+        text, senderId: currentUserId, createdAt: serverTimestamp()
+      })
+    }
+    await updateDoc(doc(db, 'chats', chatId), { lastMessageAt: serverTimestamp() })
+  }, [chatId, currentUserId])
+
+  const handleLeave = async () => {
+    isLeavingRef.current = true
+    if (chatId) try { await updateDoc(doc(db, 'chats', chatId), { status: 'ended' }) } catch { /* ignore */ }
+    navigate('/')
+  }
+  const handleSwap = async () => {
+    isLeavingRef.current = true
+    if (chatId) try { await updateDoc(doc(db, 'chats', chatId), { status: 'ended' }) } catch { /* ignore */ }
+    navigate('/', { state: { autoStart: true } })
+  }
+
+  const handleConfirmReport = async () => {
+    if (!strangerData?.id || !currentUserId || !db || isReporting) return
+    setIsReporting(true)
+    setReportError('')
+    try {
+      const strangerEmail = null // email not available client-side
+      await submitReport(
+        strangerData.id,
+        strangerData.name,
+        strangerEmail,
+        chatId || '',
+        reportReason || 'No reason given',
+        reportDescription
+      )
+      const blocked = JSON.parse(localStorage.getItem('blockedUsers') || '[]')
+      if (!blocked.includes(strangerData.id))
+        localStorage.setItem('blockedUsers', JSON.stringify([...blocked, strangerData.id]))
+      setReportSent(true)
+      setTimeout(() => { handleSwap() }, 1500)
+    } catch (e: any) {
+      const msg = e?.message || ''
+      if (msg.startsWith('ALREADY_REPORTED:')) {
+        setReportError('You have already reported this person in this session.')
+      } else {
+        console.error('Error reporting:', e)
+        setReportError('Something went wrong. Please try again.')
+      }
+    } finally {
+      setIsReporting(false)
+    }
+  }
+
+  const handleStartCall = async () => {
+    if (!chatId || !currentUserId) return
+    setIsCaller(true); setInCall(true)
+    await updateDoc(doc(db, 'chats', chatId), { videoCall: { status: 'ringing', callerId: currentUserId } })
+  }
+  const handleAcceptCall = async () => {
+    if (!chatId) return
+    setIsCaller(false); setInCall(true); setIncomingCall(false)
+    await updateDoc(doc(db, 'chats', chatId), { 'videoCall.status': 'connected' })
+  }
+  const handleDeclineCall = async () => {
+    if (!chatId) return; setIncomingCall(false)
+    await updateDoc(doc(db, 'chats', chatId), { 'videoCall.status': 'ended' })
+  }
+  const handleHangupCall = async () => {
+    if (!chatId) return; setInCall(false); setIsCaller(false)
+    await updateDoc(doc(db, 'chats', chatId), { 'videoCall.status': 'ended' })
+  }
+
+  const getGenderColor = (gender?: string) => {
+    if (gender === 'female') return 'from-pink-500 to-rose-500'
+    if (gender === 'male') return 'from-blue-500 to-cyan-500'
+    return 'from-rc-accent to-indigo-500'
+  }
+  const getGenderBadgeColor = (gender?: string) => {
+    if (gender === 'female') return 'text-pink-400 bg-pink-500/10 border-pink-500/20'
+    if (gender === 'male') return 'text-blue-400 bg-blue-500/10 border-blue-500/20'
+    return 'text-rc-accentGlow bg-rc-accent/10 border-rc-accent/20'
+  }
+
+  return (
+    <div className="flex flex-col flex-1 h-full w-full max-w-3xl mx-auto border-x border-rc-border relative overflow-hidden bg-rc-bg">
+
+      {/* Background mesh */}
+      <div className="pointer-events-none fixed inset-0 overflow-hidden z-0">
+        <div className="absolute top-0 left-0 w-80 h-80 bg-rc-accent/8 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-0 w-80 h-80 bg-indigo-700/8 rounded-full blur-3xl" />
+      </div>
+
+      {/* Video Call Overlay */}
+      {inCall && chatId && <VideoCall chatId={chatId} isCaller={isCaller} onHangup={handleHangupCall} />}
+
+      {/* Incoming Call Banner */}
+      {incomingCall && !inCall && (
+        <div className="absolute top-20 left-4 right-4 z-40 glass rounded-2xl shadow-2xl p-4 flex items-center justify-between animate-bounce">
+          <div className="flex items-center gap-3">
+            {strangerData?.avatarUrl ? (
+              <img src={strangerData.avatarUrl.replace('.glb', '.png')} alt="avatar" className="w-12 h-12 rounded-full ring-2 ring-rc-accent object-cover shadow-lg animate-pulse" />
+            ) : (
+              <div className={`w-12 h-12 bg-gradient-to-br ${getGenderColor(strangerData?.gender)} rounded-full flex items-center justify-center shadow-lg animate-pulse`}>
+                <Video className="text-white" size={20} />
+              </div>
+            )}
+            <div>
+              <h3 className="text-rc-text font-bold">{strangerData?.name || 'Stranger'}</h3>
+              <p className="text-rc-muted text-sm">Incoming video call…</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={handleDeclineCall} className="p-3 bg-red-500 hover:bg-red-600 rounded-full text-white transition-colors shadow-lg">
+              <PhoneOff size={20} />
+            </button>
+            <button onClick={handleAcceptCall} className="p-3 bg-emerald-500 hover:bg-emerald-600 rounded-full text-white transition-colors shadow-lg">
+              <Phone size={20} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Report Modal */}
+      {showReportModal && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md">
+          <div className="glass rounded-2xl p-6 w-80 shadow-2xl space-y-4">
+            {reportSent ? (
+              <div className="text-center space-y-3">
+                <div className="w-14 h-14 bg-emerald-500/20 rounded-full flex items-center justify-center mx-auto">
+                  <span className="text-3xl">✅</span>
+                </div>
+                <p className="text-rc-text font-semibold">Report Submitted</p>
+                <p className="text-rc-muted text-sm">User blocked. Finding a new match…</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center">
+                    <AlertTriangle size={20} className="text-red-400" />
+                  </div>
+                  <div>
+                    <p className="text-rc-text font-semibold">Report User</p>
+                    <p className="text-rc-muted text-xs">This user will be reviewed by our team</p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-rc-muted text-xs font-semibold uppercase tracking-wider">Reason</p>
+                  {['Inappropriate content', 'Harassment', 'Spam / Bot', 'Underage user', 'Other'].map(reason => (
+                    <button key={reason} onClick={() => setReportReason(reason)}
+                      className={`w-full text-left text-sm px-3 py-2 rounded-xl transition-all border ${reportReason === reason
+                        ? 'bg-red-500/15 text-red-400 border-red-500/40'
+                        : 'bg-rc-bg/60 border-rc-border text-rc-muted hover:border-rc-border/80'
+                        }`}>
+                      {reason}
+                    </button>
+                  ))}
+                </div>
+                <div>
+                  <p className="text-rc-muted text-xs font-semibold uppercase tracking-wider mb-1">Details <span className="text-red-400">*</span></p>
+                  <textarea
+                    value={reportDescription}
+                    onChange={e => setReportDescription(e.target.value)}
+                    placeholder="Describe what happened... (required)"
+                    maxLength={300}
+                    required
+                    className="w-full bg-rc-bg border border-rc-border rounded-xl p-2 text-sm text-rc-text outline-none focus:border-rc-accent resize-none min-h-[60px]"
+                  />
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => { setShowReportModal(false); setReportReason(''); setReportDescription(''); setReportError('') }}
+                    className="flex-1 py-2 rounded-xl bg-rc-surface border border-rc-border text-rc-muted hover:text-rc-text transition-colors text-sm">
+                    Cancel
+                  </button>
+                  <button onClick={handleConfirmReport} disabled={!reportReason || !reportDescription.trim() || isReporting}
+                    className="flex-1 py-2 rounded-xl bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-semibold transition-colors text-sm">
+                    {isReporting ? 'Submitting...' : 'Submit Report'}
+                  </button>
+                </div>
+                {reportError && (
+                  <p className="text-xs text-red-400 text-center mt-1">{reportError}</p>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <header className="relative z-10 bg-rc-panel/95 backdrop-blur-xl border-b border-rc-border py-3 px-4 flex items-center shadow-lg">
+        <button onClick={handleLeave} className="mr-3 p-2 hover:bg-rc-surface rounded-xl transition-colors text-rc-muted hover:text-rc-text">
+          <ArrowLeft size={22} />
+        </button>
+        <div className="flex-1 flex items-center gap-3">
+          {strangerData?.avatarUrl ? (
+            <img src={strangerData.avatarUrl.replace('.glb', '.png')} alt="avatar" className="w-10 h-10 rounded-full ring-2 ring-rc-accent object-cover shadow-lg shrink-0" />
+          ) : (
+            <div className={`w-10 h-10 bg-gradient-to-br ${getGenderColor(strangerData?.gender)} rounded-full flex items-center justify-center shadow-lg shrink-0`}>
+              <span className="text-white font-bold text-lg">
+                {strangerData?.name ? strangerData.name.charAt(0).toUpperCase() : 'S'}
+              </span>
+            </div>
+          )}
+          <div>
+            <h2 className="font-semibold text-rc-text flex items-center gap-2">
+              {strangerData?.name || 'Stranger'}
+              {(strangerData?.isPro || strangerData?.role === 'owner' || strangerData?.role === 'admin') && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full border uppercase tracking-wider font-bold text-amber-400 bg-amber-500/10 border-amber-500/20 shadow-glowSm flex items-center gap-1">
+                  <Zap size={8} className="fill-amber-400" /> Pro Member
+                </span>
+              )}
+              {strangerData?.role === 'owner' && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full border uppercase tracking-wider font-bold text-amber-400 bg-amber-500/10 border-amber-500/20 shadow-glowSm">
+                  👑 System Owner
+                </span>
+              )}
+              {strangerData?.role === 'admin' && (
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full border uppercase tracking-wider font-bold text-blue-400 bg-blue-500/10 border-blue-500/20 shadow-glowSm">
+                  🛡️ Moderator
+                </span>
+              )}
+              {strangerData?.gender && !strangerData?.role && (
+                <span className={`text-[9px] px-1.5 py-0.5 rounded-full border uppercase tracking-wider font-bold ${getGenderBadgeColor(strangerData.gender)}`}>
+                  {strangerData.gender}
+                </span>
+              )}
+            </h2>
+            <p className="text-[11px] flex items-center gap-1">
+              {e2eeReady ? (
+                <span className="text-emerald-400 flex items-center gap-1">
+                  <Lock size={9} /> End-to-end encrypted
+                </span>
+              ) : (
+                <span className="text-yellow-400 flex items-center gap-1">
+                  <Lock size={9} /> Setting up encryption…
+                </span>
+              )}
+            </p>
+          </div>
+        </div>
+
+        <button onClick={handleStartCall} disabled={inCall || incomingCall}
+          className="p-2 mr-1 hover:bg-rc-surface rounded-xl transition-colors text-rc-muted hover:text-rc-accentGlow disabled:opacity-40">
+          <Video size={20} />
+        </button>
+        <button onClick={() => setShowReportModal(true)} title="Report User"
+          className="p-2 mr-1 hover:bg-red-500/10 rounded-xl transition-colors text-rc-muted hover:text-red-400">
+          <Flag size={18} />
+        </button>
+        <button onClick={handleSwap}
+          className="text-xs bg-gradient-to-r from-rc-accent to-indigo-600 hover:from-rc-accentLt hover:to-indigo-500 px-3 py-1.5 rounded-xl text-white transition-all font-semibold shadow-glowSm flex items-center gap-1">
+          <Zap size={12} strokeWidth={2.5} /> Swap
+        </button>
+      </header>
+
+      {/* Chat Area */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 relative z-10">
+        <div className="text-center my-4">
+          <span className="text-xs text-rc-muted bg-rc-surface/60 border border-rc-border py-1 px-4 rounded-full">
+            You are now chatting with a stranger
+          </span>
+        </div>
+
+        {e2eeReady && (
+          <div className="text-center my-2">
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400/80 bg-emerald-500/8 border border-emerald-500/15 px-3 py-1 rounded-full">
+              <Lock size={9} /> Messages are end-to-end encrypted
+            </span>
+          </div>
+        )}
+
+        {messages.map(msg => (
+          <MessageBubble key={msg.id} message={msg} isOwnMessage={msg.senderId === currentUserId} />
+        ))}
+        <div ref={messagesEndRef} />
+      </div>
+
+      {/* Input — always enabled; send button shows spinner while E2EE is pending */}
+      <ChatInput onSendMessage={handleSendMessage} disabled={false} e2eePending={!e2eeReady} />
+    </div>
+  )
+}
