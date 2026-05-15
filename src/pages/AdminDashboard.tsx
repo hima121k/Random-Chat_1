@@ -180,7 +180,12 @@ export default function AdminDashboard() {
     catch (err: unknown) { showMsg((err as Error).message || 'Failed', true); }
   };
 
-  // ── Pro Management ──
+  const handleTogglePro = async (uid: string, currentStatus: boolean, email?: string) => {
+    const action = currentStatus ? 'Revoke' : 'Grant';
+    if (!confirm(`${action} Pro status for ${email || uid}?`)) return;
+    try {
+      await updateUserSubscription(uid, !currentStatus);
+      showMsg(`Pro status ${currentStatus ? 'revoked' : 'granted'}.`);
     } catch (err: unknown) {
       showMsg((err as Error).message || 'Failed', true);
     }
