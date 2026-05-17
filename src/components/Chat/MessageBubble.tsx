@@ -31,22 +31,27 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMess
 
   const handleReact = async (emoji: string) => {
     setShowReactions(false);
-    if (!chatId || !message.id || !currentUserId) return;
+    console.log('[Reaction System] handleReact triggered:', { chatId, messageId: message.id, currentUserId, emoji });
+    if (!chatId || !message.id || !currentUserId) {
+      console.warn('[Reaction System] Missing required fields for update:', { chatId, messageId: message.id, currentUserId });
+      return;
+    }
     try {
       const msgRef = doc(db, 'chats', chatId, 'messages', message.id);
       if (message.reactions?.[currentUserId] === emoji) {
-        // Toggle off (remove reaction)
+        console.log('[Reaction System] Toggling off reaction (removing)...');
         await updateDoc(msgRef, {
           [`reactions.${currentUserId}`]: deleteField()
         });
       } else {
-        // Set / Replace reaction (WhatsApp one select option system)
+        console.log('[Reaction System] Setting/replacing reaction to:', emoji);
         await updateDoc(msgRef, {
           [`reactions.${currentUserId}`]: emoji
         });
       }
+      console.log('[Reaction System] Firestore update completed successfully!');
     } catch (e) {
-      console.error('Failed to react:', e);
+      console.error('[Reaction System] Failed to update reaction in Firestore:', e);
     }
   };
 
