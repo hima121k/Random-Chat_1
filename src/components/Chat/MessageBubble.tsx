@@ -111,8 +111,8 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMess
         )}
 
         {/* Hover Reaction Menu (Floating above bubble) */}
-        {!isOwnMessage && showReactions && (
-          <div className="absolute bottom-full left-2 pb-2 z-20 animate-fade-in">
+        {showReactions && (
+          <div className={`absolute bottom-full pb-2 z-20 animate-fade-in ${isOwnMessage ? 'right-2' : 'left-2'}`}>
             <div className="bg-rc-panel border border-rc-border rounded-full px-2.5 py-1 flex gap-1.5 shadow-lg">
               {['👍', '😂', '❤️', '😲'].map(emoji => (
                 <button key={emoji} onClick={(e) => { e.stopPropagation(); handleReact(emoji); }} className="hover:scale-125 transition-transform text-base cursor-pointer">
