@@ -584,29 +584,33 @@ export default function Chat() {
                 </span>
               )}
             </h2>
-            <div className="text-[10px] flex items-center gap-1.5 mt-0.5 text-rc-muted overflow-x-auto hide-scrollbar flex-nowrap whitespace-nowrap w-full select-none">
+            <div className="text-[10px] flex items-center gap-2 mt-1 text-rc-muted overflow-x-auto hide-scrollbar flex-nowrap whitespace-nowrap w-full select-none py-0.5">
               {strangerData?.location && (
-                <span className="bg-rc-surface border border-rc-border px-1.5 py-0.5 rounded text-[9px] shrink-0 whitespace-nowrap">📍 {strangerData.location}</span>
+                <span className="bg-blue-500/10 border border-blue-500/20 text-blue-300 px-2.5 py-0.5 rounded-full text-[9px] shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm transition-all duration-300 hover:bg-blue-500/20">
+                  📍 {strangerData.location}
+                </span>
               )}
               {strangerData?.interests && strangerData.interests.split(', ').map((interest, idx) => (
-                <span key={idx} className="bg-rc-surface border border-rc-border px-1.5 py-0.5 rounded text-[9px] shrink-0 whitespace-nowrap">✨ {interest}</span>
+                <span key={idx} className="bg-rc-accent/10 border border-rc-accent/20 text-rc-accentGlow px-2.5 py-0.5 rounded-full text-[9px] shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm transition-all duration-300 hover:bg-rc-accent/20">
+                  ✨ {interest}
+                </span>
               ))}
               {strangerData?.mood && (
-                <span className="bg-rc-surface border border-rc-border px-1.5 py-0.5 rounded text-[9px] shrink-0 whitespace-nowrap">
+                <span className="bg-violet-500/10 border border-violet-500/20 text-violet-300 px-2.5 py-0.5 rounded-full text-[9px] shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm transition-all duration-300 hover:bg-violet-500/20">
                   {strangerData.mood === 'Chill' && '🍃 '}{strangerData.mood === 'Curious' && '🤔 '}{strangerData.mood === 'Funny' && '😂 '}{strangerData.mood === 'Deep talk' && '🌌 '}{strangerData.mood}
                 </span>
               )}
               
               {isE2eeActive ? (
-                <span className="text-emerald-400 flex items-center gap-1 shrink-0 whitespace-nowrap">
+                <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2.5 py-0.5 rounded-full text-[9px] font-semibold shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm transition-all duration-300 animate-pulse-slow">
                   <Lock size={9} /> Encrypted
                 </span>
               ) : e2eeReady ? (
-                <span className="text-amber-400 flex items-center gap-1 shrink-0 whitespace-nowrap">
+                <span className="bg-amber-500/10 border border-amber-500/20 text-amber-400 px-2.5 py-0.5 rounded-full text-[9px] font-semibold shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm">
                   <Lock size={9} /> Unencrypted
                 </span>
               ) : (
-                <span className="text-yellow-400 flex items-center gap-1 shrink-0 whitespace-nowrap">
+                <span className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 px-2.5 py-0.5 rounded-full text-[9px] font-semibold shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm animate-pulse">
                   <Lock size={9} /> Setting up...
                 </span>
               )}
