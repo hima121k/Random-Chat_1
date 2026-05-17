@@ -51,36 +51,32 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMess
   };
 
   return (
-    <div 
-      className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} group relative ${
-        message.reactions && Object.keys(message.reactions).length > 0 ? 'mb-4' : 'mb-2'
-      }`}
+    <div
+      className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} group relative ${message.reactions && Object.keys(message.reactions).length > 0 ? 'mb-4' : 'mb-2'
+        }`}
       onMouseEnter={() => setShowReactions(true)}
       onMouseLeave={() => setShowReactions(false)}
       onClick={() => setShowReactions(prev => !prev)}
     >
       <div
-        className={`px-4 py-2.5 rounded-2xl max-w-[78%] shadow-md text-sm leading-relaxed relative ${
-          isOwnMessage
+        className={`px-4 py-2.5 rounded-2xl max-w-[78%] shadow-md text-sm leading-relaxed relative ${isOwnMessage
             ? 'bg-gradient-to-br from-rc-accent to-rose-600 text-white rounded-br-sm'
             : 'bg-rc-panel border border-rc-border text-rc-text rounded-bl-sm'
-        }`}
+          }`}
       >
         {/* Reply Action Button (positioned relative to the message bubble itself!) */}
-        <button 
+        <button
           onClick={(e) => { e.stopPropagation(); onReply(message); setShowReactions(false); }}
-          className={`absolute top-1/2 -translate-y-1/2 transition-opacity p-2 bg-rc-panel border border-rc-border hover:border-rc-accent/50 rounded-full text-rc-muted hover:text-rc-accentGlow shadow-md z-10 cursor-pointer ${
-            isOwnMessage ? '-left-12' : '-right-12'
-          } ${showReactions ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+          className={`absolute top-1/2 -translate-y-1/2 transition-opacity p-2 bg-rc-panel border border-rc-border hover:border-rc-accent/50 rounded-full text-rc-muted hover:text-rc-accentGlow shadow-md z-10 cursor-pointer ${isOwnMessage ? '-left-12' : '-right-12'
+            } ${showReactions ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
           title="Reply"
         >
           <Reply size={14} className={isOwnMessage ? 'scale-x-[-1]' : ''} />
         </button>
         {/* Reply Preview inside Bubble */}
         {message.replyTo && (
-          <div className={`mb-1.5 p-2 rounded-lg border-l-2 text-xs bg-black/10 flex flex-col gap-0.5 ${
-            isOwnMessage ? 'border-white/50 text-white/90' : 'border-rc-accent/50 text-rc-muted'
-          }`}>
+          <div className={`mb-1.5 p-2 rounded-lg border-l-2 text-xs bg-black/10 flex flex-col gap-0.5 ${isOwnMessage ? 'border-white/50 text-white/90' : 'border-rc-accent/50 text-rc-muted'
+            }`}>
             <span className="font-bold text-[10px] uppercase tracking-wider">
               {message.replyTo.senderId === currentUserId ? 'You' : strangerName}
             </span>
@@ -89,7 +85,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMess
         )}
 
         <div className="break-words">{message.text}</div>
-        
+
         <div className={`flex items-center justify-end gap-1 text-[10px] mt-1 ${isOwnMessage ? 'text-white/50' : 'text-rc-muted'}`}>
           <span>{timeString}</span>
           {isOwnMessage && (
@@ -103,23 +99,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMess
 
         {/* Existing Reactions */}
         {message.reactions && Object.keys(message.reactions).length > 0 && (
-          <div 
-            onClick={(e) => e.stopPropagation()}
-            className={`absolute -bottom-3 ${isOwnMessage ? 'right-2' : 'left-2'} bg-rc-panel/90 backdrop-blur-md border border-rc-border rounded-full px-2 py-0.5 text-[10px] shadow-md flex items-center gap-1 z-10`}
-          >
+          <div className={`absolute -bottom-3 ${isOwnMessage ? 'right-2' : 'left-2'} bg-rc-panel/90 backdrop-blur-md border border-rc-border rounded-full px-2 py-0.5 text-[10px] shadow-md flex items-center gap-1 z-10`}>
             {Object.entries(message.reactions).map(([uid, emoji]) => (
-              <span 
-                key={uid} 
-                onClick={(e) => {
-                  e.stopPropagation();
-                  if (uid === currentUserId) {
-                    handleReact(emoji); // Toggles off your reaction!
-                  }
-                }}
-                className={`flex items-center gap-1 bg-rc-surface/60 px-1.5 py-0.5 rounded-full border border-rc-border/40 ${
-                  uid === currentUserId ? 'cursor-pointer hover:bg-rc-accent/15 hover:border-rc-accent/30' : ''
-                }`}
-              >
+              <span key={uid} className="flex items-center gap-1 bg-rc-surface/60 px-1.5 py-0.5 rounded-full border border-rc-border/40">
                 <span className="text-[11px] leading-none">{emoji}</span>
                 <span className="text-[8px] font-bold text-rc-muted uppercase tracking-wider leading-none">
                   {uid === currentUserId ? 'You' : strangerName}
