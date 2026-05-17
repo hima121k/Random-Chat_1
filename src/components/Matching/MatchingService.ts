@@ -33,6 +33,7 @@ export const MatchingService = {
     
     // Cache the exact moment the matching session began
     const joinTime = Date.now();
+    let queueServerTime: number | null = null;
 
     try {
       // 0. Check if the current user is banned.
@@ -187,8 +188,14 @@ export const MatchingService = {
         // Watch our own waiting doc — if it still exists and gets deleted it means
         // we were matched; fall back to the chats listener below.
         const unsubWaiting = onSnapshot(waitingDocRef, (snapshot) => {
-          // doc was deleted by the matcher — the chats listener will fire shortly
-          if (!snapshot.exists()) {
+          if (snapshot.exists()) {
+            const data = snapshot.data();
+            // Cache the server's exact timestamp for this queue entry to prevent clock skew bugs!
+            if (data.createdAt) {
+              queueServerTime = data.createdAt.toDate ? data.createdAt.toDate().getTime() : data.createdAt;
+            }
+          } else {
+            // doc was deleted by the matcher — the chats listener will fire shortly
             unsubWaiting();
           }
         });
@@ -208,7 +215,16 @@ export const MatchingService = {
             if (data.status !== 'active') return false;
             
             const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().getTime() : data.createdAt;
-            return createdAt && createdAt >= (joinTime - 5000);
+            // If the chat has no resolved timestamp yet, it is fresh and new!
+            if (!createdAt) return true;
+
+            // If we have the server-confirmed queue entry time, compare using it (perfect sync!)
+            if (queueServerTime) {
+              return createdAt >= (queueServerTime - 5000);
+            }
+            
+            // Fallback: compare against local time with a generous 60-second buffer to absorb any device clock skew
+            return createdAt >= (joinTime - 60000);
           });
 
           if (newChat) {
