@@ -65,24 +65,24 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMess
 
         {/* Existing Reactions */}
         {message.reactions && message.reactions.length > 0 && (
-          <div className={`absolute -bottom-3 ${isOwnMessage ? 'right-2' : 'left-2'} bg-rc-panel border border-rc-border rounded-full px-1.5 py-0.5 text-xs shadow-md flex gap-0.5`}>
+          <div className={`absolute -bottom-3 ${isOwnMessage ? 'right-2' : 'left-2'} bg-rc-panel border border-rc-border rounded-full px-1.5 py-0.5 text-xs shadow-md flex gap-0.5 z-10`}>
             {message.reactions.map((emoji, i) => (
               <span key={i}>{emoji}</span>
             ))}
           </div>
         )}
-      </div>
 
-      {/* Hover Reaction Menu */}
-      {!isOwnMessage && showReactions && (
-        <div className="absolute top-1/2 -translate-y-1/2 -right-[110px] bg-rc-panel border border-rc-border rounded-full px-2 py-1 flex gap-1 shadow-lg z-10 animate-fade-in">
-          {['👍', '😂', '❤️', '😲'].map(emoji => (
-            <button key={emoji} onClick={(e) => { e.stopPropagation(); handleReact(emoji); }} className="hover:scale-125 transition-transform text-base">
-              {emoji}
-            </button>
-          ))}
-        </div>
-      )}
+        {/* Hover Reaction Menu (Floating above bubble) */}
+        {!isOwnMessage && showReactions && (
+          <div className="absolute -top-10 left-2 bg-rc-panel border border-rc-border rounded-full px-2.5 py-1 flex gap-1.5 shadow-lg z-20 animate-fade-in">
+            {['👍', '😂', '❤️', '😲'].map(emoji => (
+              <button key={emoji} onClick={(e) => { e.stopPropagation(); handleReact(emoji); }} className="hover:scale-125 transition-transform text-base cursor-pointer">
+                {emoji}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
