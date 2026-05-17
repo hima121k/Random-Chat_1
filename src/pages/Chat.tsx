@@ -22,6 +22,9 @@ import {
   deriveSharedKey,
   encryptMessage,
   decryptMessage,
+  saveKeyPairToSession,
+  loadKeyPairFromSession,
+  arrayBufferToBase64,
   type EncryptedPayload,
 } from '../lib/crypto'
 import { submitReport } from '../services/admin'
@@ -49,7 +52,7 @@ export default function Chat() {
   const navigate = useNavigate()
 
   const [messages, setMessages] = useState<Message[]>([])
-  const [strangerData, setStrangerData] = useState<{ id: string; name: string; gender: string; avatarUrl?: string; role?: string; isPro?: boolean } | null>(null)
+  const [strangerData, setStrangerData] = useState<{ id: string; name: string; gender: string; avatarUrl?: string; role?: string; isPro?: boolean; mood?: string; location?: string; interests?: string } | null>(null)
 
   // E2EE
   const myKeyPairRef = useRef<CryptoKeyPair | null>(null)
@@ -57,6 +60,7 @@ export default function Chat() {
   const [e2eeReady, setE2eeReady] = useState(false)
   const [isE2eeActive, setIsE2eeActive] = useState(false) // true only when actual E2EE key is derived
   const [keyVersion, setKeyVersion] = useState(0)
+  const [peerTyping, setPeerTyping] = useState(false)
 
   // Video Call
   const [incomingCall, setIncomingCall] = useState(false)
@@ -102,7 +106,19 @@ export default function Chat() {
 
     const initE2EE = async () => {
       try {
-        const { keyPair, publicKeyB64 } = await generateECDHKeyPair()
+        let keyPair = await loadKeyPairFromSession(chatId);
+        let publicKeyB64: string;
+
+        if (keyPair) {
+          const raw = await window.crypto.subtle.exportKey('raw', keyPair.publicKey);
+          publicKeyB64 = arrayBufferToBase64(raw);
+        } else {
+          const generated = await generateECDHKeyPair();
+          keyPair = generated.keyPair;
+          publicKeyB64 = generated.publicKeyB64;
+          await saveKeyPairToSession(chatId, keyPair);
+        }
+
         if (cancelled) return
         myKeyPairRef.current = keyPair
 
@@ -147,23 +163,7 @@ export default function Chat() {
   useEffect(() => {
     if (!chatId) { navigate('/'); return }
 
-    // If this is a new navigation (not a refresh), verify it came from Home
-    if (lastNavigatedChatId !== chatId) {
-      const activeId = sessionStorage.getItem('active_chat_id');
-      if (activeId !== chatId) {
-        console.warn('Unauthorized chat access or stale session. Redirecting to home.');
-        const unsub = onAuthStateChanged(auth, async (user) => {
-          unsub()
-          if (user && chatId) {
-            try { await updateDoc(doc(db, 'chats', chatId), { status: 'ended' }) } catch (err) { console.error("Failed to end chat:", err); }
-          }
-          navigate('/', { replace: true })
-        })
-        setTimeout(() => navigate('/', { replace: true }), 1500)
-        return
-      }
-      lastNavigatedChatId = chatId
-    }
+    // We now rely on Firestore rules to reject unauthorized access.
 
     if (isAuthLoading) return;
     if (!currentUserId) { navigate('/'); return }
@@ -191,7 +191,10 @@ export default function Chat() {
                   gender: data.users[otherId]?.gender,
                   avatarUrl: data.users[otherId]?.avatarUrl,
                   role: userData.role || 'user',
-                  isPro: userData.isPro || false
+                  isPro: userData.isPro || false,
+                  mood: data.users[otherId]?.mood,
+                  location: data.users[otherId]?.location,
+                  interests: data.users[otherId]?.interests
                 });
               } else {
                 // Fallback to chat room data if user doc doesn't exist yet
@@ -206,6 +209,18 @@ export default function Chat() {
           else if (data.videoCall.status === 'ended') { setInCall(false); setIncomingCall(false) }
           else if (data.videoCall.status === 'connected' && data.videoCall.callerId !== currentUserId) setIncomingCall(false)
         }
+
+        if (data.typing) {
+          const otherId = data.participants.find((id: string) => id !== currentUserId)
+          if (otherId && data.typing[otherId]) {
+            setPeerTyping(true)
+          } else {
+            setPeerTyping(false)
+          }
+        } else {
+          setPeerTyping(false)
+        }
+
         // Fix 3: only redirect on a server-confirmed ended status
         if (data.status === 'ended' && !isLeavingRef.current) navigate('/', { state: { autoStart: true } })
       } else {
@@ -213,6 +228,7 @@ export default function Chat() {
       }
     }, (err) => {
       console.error('Chat snapshot error:', err);
+      if (!isLeavingRef.current) navigate('/', { replace: true });
     })
 
     return () => { 
@@ -244,18 +260,26 @@ export default function Chat() {
       const rawMsgs = snapshot.docs.map(d => ({ id: d.id, ...d.data() })) as RawMessage[]
       const decrypted = await Promise.all(
         rawMsgs.map(async (raw): Promise<Message> => {
+          const anyRaw = raw as unknown as Record<string, unknown>
+          const reactions = anyRaw.reactions as string[] | undefined
+          const isRead = !!anyRaw.isRead
+
+          // Mark as read if from stranger
+          if (raw.senderId !== currentUserId && !isRead) {
+            updateDoc(doc(db, 'chats', chatId, 'messages', raw.id), { isRead: true }).catch(() => {});
+          }
+
           // Support both encrypted (ct/iv) and plaintext (text) message formats
           const hasEncrypted = raw.ct && raw.iv
           if (!hasEncrypted) {
             // Plaintext fallback message
-            const anyRaw = raw as unknown as Record<string, unknown>
-            return { id: raw.id, text: (anyRaw.text as string) ?? '', senderId: raw.senderId, createdAt: raw.createdAt }
+            return { id: raw.id, text: (anyRaw.text as string) ?? '', senderId: raw.senderId, createdAt: raw.createdAt, reactions, isRead }
           }
           if (!sharedKeyRef.current)
-            return { id: raw.id, text: '🔒 Decrypting…', senderId: raw.senderId, createdAt: raw.createdAt }
+            return { id: raw.id, text: '🔒 Decrypting…', senderId: raw.senderId, createdAt: raw.createdAt, reactions, isRead }
           const payload: EncryptedPayload = { ct: raw.ct, iv: raw.iv }
           const plaintext = await decryptMessage(payload, sharedKeyRef.current)
-          return { id: raw.id, text: plaintext ?? '🔒 Encrypted message', senderId: raw.senderId, createdAt: raw.createdAt }
+          return { id: raw.id, text: plaintext ?? '🔒 Encrypted message', senderId: raw.senderId, createdAt: raw.createdAt, reactions, isRead }
         })
       )
       if (mounted) setMessages(decrypted)                       // Fix #8: guard
@@ -285,6 +309,11 @@ export default function Chat() {
     }
     await updateDoc(doc(db, 'chats', chatId), { lastMessageAt: serverTimestamp() })
   }, [chatId, currentUserId])
+
+  const handleTyping = useCallback((isTyping: boolean) => {
+    if (!chatId || !currentUserId || isLeavingRef.current) return;
+    updateDoc(doc(db, 'chats', chatId), { [`typing.${currentUserId}`]: isTyping }).catch(() => {});
+  }, [chatId, currentUserId]);
 
   const handleLeave = async () => {
     isLeavingRef.current = true
@@ -477,15 +506,18 @@ export default function Chat() {
           <ArrowLeft size={22} />
         </button>
         <div className="flex-1 flex items-center gap-3">
-          {strangerData?.avatarUrl ? (
-            <img src={typeof strangerData.avatarUrl === 'string' ? strangerData.avatarUrl.replace('.glb', '.png') : ''} alt="avatar" className="w-10 h-10 rounded-full ring-2 ring-rc-accent object-cover shadow-lg shrink-0" />
-          ) : (
-            <div className={`w-10 h-10 bg-gradient-to-br ${getGenderColor(strangerData?.gender)} rounded-full flex items-center justify-center shadow-lg shrink-0`}>
-              <span className="text-white font-bold text-lg">
-                {strangerData?.name ? strangerData.name.charAt(0).toUpperCase() : 'S'}
-              </span>
-            </div>
-          )}
+          <div className="relative shrink-0">
+            {strangerData?.avatarUrl ? (
+              <img src={typeof strangerData.avatarUrl === 'string' ? strangerData.avatarUrl.replace('.glb', '.png') : ''} alt="avatar" className="w-10 h-10 rounded-full ring-2 ring-rc-accent object-cover shadow-lg shrink-0" />
+            ) : (
+              <div className={`w-10 h-10 bg-gradient-to-br ${getGenderColor(strangerData?.gender)} rounded-full flex items-center justify-center shadow-lg shrink-0`}>
+                <span className="text-white font-bold text-lg">
+                  {strangerData?.name ? strangerData.name.charAt(0).toUpperCase() : 'S'}
+                </span>
+              </div>
+            )}
+            <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-rc-panel rounded-full shadow-glowSm"></div>
+          </div>
           <div>
             <h2 className="font-semibold text-rc-text flex items-center gap-2">
               {strangerData?.name || 'Stranger'}
@@ -510,21 +542,33 @@ export default function Chat() {
                 </span>
               )}
             </h2>
-            <p className="text-[11px] flex items-center gap-1">
-              {isE2eeActive ? (
-                <span className="text-emerald-400 flex items-center gap-1">
-                  <Lock size={9} /> End-to-end encrypted
-                </span>
-              ) : e2eeReady ? (
-                <span className="text-amber-400 flex items-center gap-1">
-                  <Lock size={9} /> Unencrypted mode
-                </span>
-              ) : (
-                <span className="text-yellow-400 flex items-center gap-1">
-                  <Lock size={9} /> Setting up encryption…
+            <div className="text-[11px] flex items-center gap-1 mt-0.5 text-rc-muted flex-wrap">
+              {strangerData?.location && (
+                <span className="bg-rc-surface border border-rc-border px-1.5 py-0.5 rounded text-[10px]">📍 {strangerData.location}</span>
+              )}
+              {strangerData?.interests && strangerData.interests.split(', ').map((interest, idx) => (
+                <span key={idx} className="bg-rc-surface border border-rc-border px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap">✨ {interest}</span>
+              ))}
+              {strangerData?.mood && (
+                <span className="bg-rc-surface border border-rc-border px-1.5 py-0.5 rounded text-[10px]">
+                  {strangerData.mood === 'Chill' && '🍃 '}{strangerData.mood === 'Curious' && '🤔 '}{strangerData.mood === 'Funny' && '😂 '}{strangerData.mood === 'Deep talk' && '🌌 '}{strangerData.mood}
                 </span>
               )}
-            </p>
+              
+              {isE2eeActive ? (
+                <span className="text-emerald-400 flex items-center gap-1 ml-1">
+                  <Lock size={9} /> Encrypted
+                </span>
+              ) : e2eeReady ? (
+                <span className="text-amber-400 flex items-center gap-1 ml-1">
+                  <Lock size={9} /> Unencrypted
+                </span>
+              ) : (
+                <span className="text-yellow-400 flex items-center gap-1 ml-1">
+                  <Lock size={9} /> Setting up...
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -537,8 +581,8 @@ export default function Chat() {
           <Flag size={18} />
         </button>
         <button onClick={handleSwap}
-          className="text-xs bg-gradient-to-r from-rc-accent to-indigo-600 hover:from-rc-accentLt hover:to-indigo-500 px-3 py-1.5 rounded-xl text-white transition-all font-semibold shadow-glowSm flex items-center gap-1">
-          <Zap size={12} strokeWidth={2.5} /> Swap
+          className="text-xs bg-gradient-to-r from-rc-surface to-rc-bg border border-rc-border hover:border-rc-accent/50 px-3 py-1.5 rounded-xl text-rc-text transition-all font-semibold shadow-glowSm flex items-center gap-1">
+          Skip ➔
         </button>
       </header>
 
@@ -567,13 +611,22 @@ export default function Chat() {
         )}
 
         {messages.map(msg => (
-          <MessageBubble key={msg.id} message={msg} isOwnMessage={msg.senderId === currentUserId} />
+          <MessageBubble key={msg.id} message={msg} isOwnMessage={msg.senderId === currentUserId} chatId={chatId} />
         ))}
+        {peerTyping && (
+          <div className="flex justify-start">
+            <div className="px-4 py-2 bg-rc-panel border border-rc-border rounded-2xl rounded-bl-sm flex items-center gap-1.5 shadow-sm w-fit mt-2">
+              <span className="w-1.5 h-1.5 bg-rc-muted rounded-full animate-bounce"></span>
+              <span className="w-1.5 h-1.5 bg-rc-muted rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></span>
+              <span className="w-1.5 h-1.5 bg-rc-muted rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></span>
+            </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
       {/* Input — always enabled; send button shows spinner while E2EE is pending */}
-      <ChatInput onSendMessage={handleSendMessage} disabled={false} e2eePending={!e2eeReady} />
+      <ChatInput onSendMessage={handleSendMessage} disabled={false} e2eePending={!e2eeReady} onTyping={handleTyping} />
     </div>
   )
 }

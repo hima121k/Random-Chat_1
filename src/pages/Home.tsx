@@ -17,6 +17,9 @@ export default function Home() {
   const [name, setName] = useState(() => localStorage.getItem('chat_name') || '')
   const [gender, setGender] = useState(() => localStorage.getItem('chat_gender') || 'male')
   const [age, setAge] = useState(() => localStorage.getItem('chat_age') || '18')
+  const [mood, setMood] = useState(() => localStorage.getItem('chat_mood') || 'Chill')
+  const [locationStr, setLocationStr] = useState(() => localStorage.getItem('chat_location') || '')
+  const [interestsStr, setInterestsStr] = useState(() => localStorage.getItem('chat_interests') || '')
   const [avatarUrl, setAvatarUrl] = useState(() => localStorage.getItem('chat_avatar') || '')
   const [showAvatarCreator, setShowAvatarCreator] = useState(false)
   const [currentUser, setCurrentUser] = useState<User | null>(null)
@@ -211,6 +214,9 @@ export default function Home() {
     localStorage.setItem('chat_name', name.trim())
     localStorage.setItem('chat_gender', gender)
     localStorage.setItem('chat_age', age)
+    localStorage.setItem('chat_mood', mood)
+    localStorage.setItem('chat_location', locationStr.trim())
+    localStorage.setItem('chat_interests', interestsStr.trim())
     if (avatarUrl) localStorage.setItem('chat_avatar', avatarUrl)
     setError(null); setIsMatching(true)
 
@@ -224,7 +230,10 @@ export default function Home() {
         avatarUrl, 
         role: userRole,
         matchGender,
-        isPro: subscription.isPro 
+        isPro: subscription.isPro,
+        mood,
+        location: locationStr.trim(),
+        interests: interestsStr.trim()
       }, (chatId) => {
         matchedRef.current = true  // Fix 1: mark as matched before navigating
         setIsMatching(false)
@@ -245,7 +254,7 @@ export default function Home() {
         setError(msg || 'Failed to connect.'); setIsMatching(false)
       }
     }
-  }, [name, gender, age, avatarUrl, navigate, currentUser, matchGender, subscription.isPro])
+  }, [name, gender, age, avatarUrl, navigate, currentUser, matchGender, subscription.isPro, mood, locationStr, interestsStr])
 
   useEffect(() => {
     // Fix 1: only leave the queue on unmount if we never found a match
@@ -579,6 +588,62 @@ export default function Home() {
                   {label}
                 </label>
               ))}
+            </div>
+          </div>
+          {/* Vibe & Details */}
+          <div>
+            <label className="block text-xs font-semibold text-rc-muted mb-2 uppercase tracking-wider">Set your vibe</label>
+            <div className="flex gap-2 mb-4 overflow-x-auto pb-1 hide-scrollbar">
+              {['Chill', 'Curious', 'Funny', 'Deep talk'].map((m) => (
+                <button
+                  key={m}
+                  onClick={() => setMood(m)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all border ${
+                    mood === m
+                      ? 'bg-rc-accent/20 border-rc-accent/60 text-rc-accentGlow shadow-glowSm'
+                      : 'bg-rc-bg/60 border-rc-border text-rc-muted hover:border-rc-border/80'
+                  }`}
+                >
+                  {m === 'Chill' && '🍃 '}{m === 'Curious' && '🤔 '}{m === 'Funny' && '😂 '}{m === 'Deep talk' && '🌌 '}{m}
+                </button>
+              ))}
+            </div>
+            
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-rc-muted mb-2 uppercase tracking-wider">Location (Optional)</label>
+                <input type="text" value={locationStr} onChange={e => setLocationStr(e.target.value)}
+                  placeholder="e.g. London, UK" maxLength={30} className="input-field text-sm" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-rc-muted mb-2 uppercase tracking-wider">Interests (Select up to 3)</label>
+                <div className="flex flex-wrap gap-2">
+                  {['Gaming 🎮', 'Music 🎵', 'Movies 🍿', 'Tech 💻', 'Sports 🏀', 'Anime 🌸', 'Books 📚', 'Travel ✈️', 'Art 🎨', 'Fitness 💪'].map(int => {
+                    const selected = interestsStr.includes(int);
+                    return (
+                      <button
+                        key={int}
+                        type="button"
+                        onClick={() => {
+                          const current = interestsStr ? interestsStr.split(', ') : [];
+                          if (selected) {
+                            setInterestsStr(current.filter(i => i !== int).join(', '));
+                          } else if (current.length < 3) {
+                            setInterestsStr([...current, int].join(', '));
+                          }
+                        }}
+                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                          selected
+                            ? 'bg-rc-accent/20 border-rc-accent/60 text-rc-accentGlow shadow-glowSm'
+                            : 'bg-rc-bg/60 border-rc-border text-rc-muted hover:border-rc-border/80'
+                        }`}
+                      >
+                        {int}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
             </div>
           </div>
           

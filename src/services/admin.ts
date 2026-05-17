@@ -251,13 +251,23 @@ export const syncUserProfile = async (user: User, role: Role = 'user', isPro: bo
   if (!db || !user) return;
   try {
     const userRef = doc(db, 'users', user.uid);
-    await setDoc(userRef, {
-      email: user.email?.toLowerCase(),
-      displayName: user.displayName,
-      lastLogin: serverTimestamp(),
-      role: role,
-      isPro: isPro
-    }, { merge: true });
+    const existing = await getDoc(userRef);
+
+    if (existing.exists()) {
+      await updateDoc(userRef, {
+        email: user.email?.toLowerCase(),
+        displayName: user.displayName,
+        lastLogin: serverTimestamp()
+      });
+    } else {
+      await setDoc(userRef, {
+        email: user.email?.toLowerCase(),
+        displayName: user.displayName,
+        lastLogin: serverTimestamp(),
+        role: role,
+        isPro: isPro
+      });
+    }
   } catch (error) {
     console.error("Error syncing user profile:", error);
   }

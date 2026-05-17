@@ -6,11 +6,13 @@ interface ChatInputProps {
   onSendMessage: (text: string) => Promise<void>;
   disabled?: boolean;
   e2eePending?: boolean;
+  onTyping?: (isTyping: boolean) => void;
 }
 
-export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, e2eePending }) => {
+export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, e2eePending, onTyping }) => {
   const [text, setText] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null); // Fix #9: ref for click-outside
@@ -22,15 +24,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, e
     inputRef.current?.focus();
   }, []);
 
-  // Fix #9: close emoji picker on outside click
+  // Close emoji picker using a backdrop instead of document listeners
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
-        setShowEmojiPicker(false);
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
+    // Intentionally left empty, cleanup removed
   }, []);
 
   const handleSend = async (e?: React.FormEvent) => {
@@ -42,6 +38,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, e
     try {
       await onSendMessage(trimmed);
       setText('');
+      if (onTyping) onTyping(false);
     } catch (error) {
       console.error('Failed to send message:', error);
     } finally {
@@ -50,21 +47,53 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, e
     }
   };
 
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setText(e.target.value);
+    if (onTyping) {
+      onTyping(true);
+      if (typingTimeout) clearTimeout(typingTimeout);
+      setTypingTimeout(setTimeout(() => onTyping(false), 1500));
+    }
+  };
+
   const onEmojiClick = (emojiData: EmojiClickData) => {
     setText((prev) => prev + emojiData.emoji);
   };
 
   return (
-    <footer className="relative bg-rc-panel/95 backdrop-blur-xl border-t border-rc-border p-3 flex items-center gap-2">
-      {showEmojiPicker && (
-        <div ref={emojiPickerRef} className="absolute bottom-[72px] left-2 z-50 shadow-2xl rounded-2xl overflow-hidden">
-          <EmojiPicker
-            onEmojiClick={onEmojiClick}
-            theme={Theme.DARK}
-            searchDisabled={false}
-            skinTonesDisabled={true}
-          />
+    <footer className="relative z-20 bg-rc-panel/95 backdrop-blur-xl border-t border-rc-border p-3 flex items-center gap-2 mt-auto">
+      {/* Quick replies */}
+      {!text && !disabled && (
+        <div className="absolute -top-12 left-0 w-full flex gap-2 px-3 overflow-x-auto hide-scrollbar z-10 pb-2">
+          {['Hey! 👋', 'Where are you from? 🌍', 'What\'s your vibe? ✨', 'Got any hobbies? 🎸'].map(qr => (
+            <button key={qr} type="button" 
+              onClick={() => { 
+                setText(qr); 
+                inputRef.current?.focus(); 
+                setShowEmojiPicker(false);
+              }}
+              className="px-3 py-1.5 bg-rc-panel/95 backdrop-blur-md border border-rc-border rounded-full text-[11px] font-medium text-rc-text hover:bg-rc-surface transition-colors whitespace-nowrap shadow-sm shrink-0">
+              {qr}
+            </button>
+          ))}
         </div>
+      )}
+      {showEmojiPicker && (
+        <>
+          <div 
+            className="fixed inset-0 z-40" 
+            onClick={() => setShowEmojiPicker(false)}
+            onTouchStart={() => setShowEmojiPicker(false)}
+          />
+          <div className="absolute bottom-[72px] left-2 z-50 shadow-2xl rounded-2xl overflow-hidden">
+            <EmojiPicker
+              onEmojiClick={onEmojiClick}
+              theme={Theme.DARK}
+              searchDisabled={false}
+              skinTonesDisabled={true}
+            />
+          </div>
+        </>
       )}
 
       {/* Emoji button */}
@@ -89,9 +118,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, e
             ref={inputRef}
             type="text"
             value={text}
-            onChange={(e) => setText(e.target.value)}
+            onChange={handleChange}
             onFocus={() => setShowEmojiPicker(false)}
-            placeholder={disabled ? 'Chat ended' : 'Type a message…'}
+            placeholder={disabled ? 'Chat ended' : 'Say something real...'}
             className="w-full bg-transparent outline-none text-rc-text placeholder-rc-muted text-sm"
             disabled={disabled || isSending}
             autoComplete="off"
@@ -111,9 +140,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, e
         <button
           type="submit"
           disabled={!text.trim() || isSending || disabled}
-          className="p-2.5 bg-gradient-to-br from-rc-accent to-indigo-600 hover:from-rc-accentLt hover:to-indigo-500
+          className="p-2.5 bg-gradient-to-br from-rc-accent to-rose-600 hover:from-rc-accentLt hover:to-rose-500
                      text-white rounded-2xl transition-all shadow-glowSm
-                     disabled:opacity-40 disabled:shadow-none disabled:hover:from-rc-accent disabled:hover:to-indigo-600
+                     disabled:opacity-40 disabled:shadow-none disabled:hover:from-rc-accent disabled:hover:to-rose-600
                      active:scale-95 shrink-0"
           title={e2eePending ? 'Setting up encryption…' : 'Send'}
         >

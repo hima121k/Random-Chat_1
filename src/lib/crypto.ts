@@ -32,7 +32,7 @@ function getSubtle(): SubtleCrypto {
   return subtle;
 }
 
-function arrayBufferToBase64(buf: ArrayBuffer): string {
+export function arrayBufferToBase64(buf: ArrayBuffer): string {
   const bytes = new Uint8Array(buf);
   let binary = '';
   bytes.forEach(b => (binary += String.fromCharCode(b)));
@@ -44,6 +44,32 @@ function base64ToArrayBuffer(b64: string): ArrayBuffer {
   const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return bytes.buffer;
+}
+
+export async function saveKeyPairToSession(chatId: string, keyPair: CryptoKeyPair) {
+  const subtle = getSubtle();
+  const raw = await subtle.exportKey('pkcs8', keyPair.privateKey);
+  const pub = await subtle.exportKey('raw', keyPair.publicKey);
+  sessionStorage.setItem(`e2ee_priv_${chatId}`, arrayBufferToBase64(raw));
+  sessionStorage.setItem(`e2ee_pub_${chatId}`,  arrayBufferToBase64(pub));
+}
+
+export async function loadKeyPairFromSession(chatId: string): Promise<CryptoKeyPair | null> {
+  const subtle = getSubtle();
+  const privB64 = sessionStorage.getItem(`e2ee_priv_${chatId}`);
+  const pubB64  = sessionStorage.getItem(`e2ee_pub_${chatId}`);
+  if (!privB64 || !pubB64) return null;
+  try {
+    const privateKey = await subtle.importKey(
+      'pkcs8', base64ToArrayBuffer(privB64),
+      { name: 'ECDH', namedCurve: 'P-256' }, true, ['deriveKey']
+    );
+    const publicKey = await subtle.importKey(
+      'raw', base64ToArrayBuffer(pubB64),
+      { name: 'ECDH', namedCurve: 'P-256' }, true, []
+    );
+    return { privateKey, publicKey };
+  } catch { return null; }
 }
 
 // ── Key Generation ────────────────────────────────────────────────────────────

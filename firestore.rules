@@ -45,7 +45,9 @@ service cloud.firestore {
               && request.resource.data.text is string
               && request.resource.data.text.size() <= 2000)
           );
-        allow update, delete: if false;
+        allow update: if request.auth != null
+          && (request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants);
+        allow delete: if false;
       }
 
       match /e2eeKeys/{uid} {
@@ -74,7 +76,12 @@ service cloud.firestore {
     match /banned_users/{userId} {
       allow read: if true;
       // Only owners/admins can write bans; auto-bans use the Admin SDK (Cloud Functions)
-      allow write: if isAdmin();
+      // Allow users to write if it's an auto-ban (bannedBy: auto-system)
+      allow write: if isAdmin() || (
+        request.auth != null && 
+        request.resource.data.bannedBy == 'auto-system' &&
+        request.resource.data.bannedByRole == 'admin'
+      );
     }
 
     match /reports/{reportId} {

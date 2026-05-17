@@ -10,6 +10,9 @@ export interface UserData {
   role?: string;
   matchGender?: string;
   isPro?: boolean;
+  mood?: string;
+  location?: string;
+  interests?: string;
 }
 
 export interface ChatRoom {

@@ -4,18 +4,18 @@
 
 /* ── Tailwind v4 custom theme ──────────────────────────────────── */
 @theme {
-  --color-rc-bg:         #0d0d1a;
-  --color-rc-surface:    #13132b;
-  --color-rc-panel:      #1a1a35;
-  --color-rc-border:     #2a2a55;
-  --color-rc-accent:     #7c3aed;
-  --color-rc-accentLt:   #8b5cf6;
-  --color-rc-accentGlow: #a78bfa;
-  --color-rc-bubbleMe:   #4c1d95;
-  --color-rc-bubbleThem: #1e1b4b;
-  --color-rc-text:       #e2e8f0;
-  --color-rc-muted:      #64748b;
-  --color-rc-dimmed:     #475569;
+  --color-rc-bg:         #0a0507;
+  --color-rc-surface:    #160a0f;
+  --color-rc-panel:      #231018;
+  --color-rc-border:     #3b1b2a;
+  --color-rc-accent:     #f43f5e;
+  --color-rc-accentLt:   #fb7185;
+  --color-rc-accentGlow: #fda4af;
+  --color-rc-bubbleMe:   #e11d48;
+  --color-rc-bubbleThem: #231018;
+  --color-rc-text:       #fff1f2;
+  --color-rc-muted:      #fecdd3;
+  --color-rc-dimmed:     #fb7185;
 
   --font-family-sans: 'Inter', system-ui, sans-serif;
 
@@ -41,44 +41,44 @@
     font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     background-image:
-      radial-gradient(at 20% 10%, rgba(124,58,237,0.12) 0%, transparent 50%),
-      radial-gradient(at 80% 90%, rgba(99,102,241,0.08) 0%, transparent 50%);
+      radial-gradient(at 20% 10%, rgba(244, 63, 94, 0.15) 0%, transparent 50%),
+      radial-gradient(at 80% 90%, rgba(225, 29, 72, 0.1) 0%, transparent 50%);
     min-height: 100vh;
   }
 
   ::-webkit-scrollbar { width: 4px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: #2a2a55; border-radius: 4px; }
-  ::-webkit-scrollbar-thumb:hover { background: #7c3aed; }
+  ::-webkit-scrollbar-thumb { background: #4c1d2e; border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: #f43f5e; }
 }
 
 /* ── Component classes (plain CSS, no @apply) ─────────────────── */
 @layer components {
   .glass {
-    background: rgba(19, 19, 43, 0.85);
+    background: rgba(22, 10, 15, 0.85);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(124, 58, 237, 0.15);
+    border: 1px solid rgba(244, 63, 94, 0.2);
   }
 
   .glass-light {
-    background: rgba(26, 26, 53, 0.70);
+    background: rgba(35, 16, 24, 0.70);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(124, 58, 237, 0.12);
+    border: 1px solid rgba(244, 63, 94, 0.15);
   }
 
   .card {
-    background: rgba(19, 19, 43, 0.85);
+    background: rgba(22, 10, 15, 0.95);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(124, 58, 237, 0.15);
+    border: 1px solid rgba(244, 63, 94, 0.2);
     border-radius: 1rem;
     box-shadow: 0 25px 50px rgba(0,0,0,0.4);
   }
 
-  .shadow-glow   { box-shadow: 0 0 20px rgba(124,58,237,0.35); }
-  .shadow-glowSm { box-shadow: 0 0 10px rgba(124,58,237,0.25); }
+  .shadow-glow   { box-shadow: 0 0 20px rgba(244, 63, 94, 0.35); }
+  .shadow-glowSm { box-shadow: 0 0 10px rgba(244, 63, 94, 0.25); }
 
   .animate-pulse-slow { animation: pulse-slow 3s ease-in-out infinite; }
   .animate-float      { animation: float-up 6s ease-in-out infinite; }
@@ -87,17 +87,17 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #7c3aed, #4f46e5);
+    background: linear-gradient(135deg, #f43f5e, #be123c);
     color: #fff;
     font-weight: 600;
     border-radius: 0.75rem;
     transition: all 0.2s;
-    box-shadow: 0 0 16px rgba(124,58,237,0.3);
+    box-shadow: 0 0 16px rgba(244, 63, 94, 0.3);
     cursor: pointer;
     border: none;
   }
   .btn-primary:hover:not(:disabled) {
-    background: linear-gradient(135deg, #8b5cf6, #6366f1);
+    background: linear-gradient(135deg, #fb7185, #f43f5e);
     box-shadow: none;
   }
   .btn-primary:active:not(:disabled) { transform: scale(0.96); }
@@ -105,17 +105,17 @@
 
   .input-field {
     width: 100%;
-    background: rgba(13,13,26,0.8);
-    border: 1px solid #2a2a55;
-    color: #e2e8f0;
+    background: rgba(10, 5, 7, 0.8);
+    border: 1px solid #3b1b2a;
+    color: #fff1f2;
     border-radius: 0.75rem;
     padding: 0.75rem 1rem;
     outline: none;
     transition: all 0.2s;
   }
-  .input-field::placeholder { color: #64748b; }
+  .input-field::placeholder { color: #fecdd3; }
   .input-field:focus {
-    border-color: #7c3aed;
-    box-shadow: 0 0 0 3px rgba(124,58,237,0.15);
+    border-color: #f43f5e;
+    box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.15);
   }
 }
