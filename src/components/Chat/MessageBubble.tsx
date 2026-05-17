@@ -31,27 +31,22 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMess
 
   const handleReact = async (emoji: string) => {
     setShowReactions(false);
-    console.log('[Reaction System] handleReact triggered:', { chatId, messageId: message.id, currentUserId, emoji });
-    if (!chatId || !message.id || !currentUserId) {
-      console.warn('[Reaction System] Missing required fields for update:', { chatId, messageId: message.id, currentUserId });
-      return;
-    }
+    if (!chatId || !message.id || !currentUserId) return;
     try {
       const msgRef = doc(db, 'chats', chatId, 'messages', message.id);
       if (message.reactions?.[currentUserId] === emoji) {
-        console.log('[Reaction System] Toggling off reaction (removing)...');
+        // Toggle off (remove reaction)
         await updateDoc(msgRef, {
           [`reactions.${currentUserId}`]: deleteField()
         });
       } else {
-        console.log('[Reaction System] Setting/replacing reaction to:', emoji);
+        // Set / Replace reaction (WhatsApp one select option system)
         await updateDoc(msgRef, {
           [`reactions.${currentUserId}`]: emoji
         });
       }
-      console.log('[Reaction System] Firestore update completed successfully!');
     } catch (e) {
-      console.error('[Reaction System] Failed to update reaction in Firestore:', e);
+      console.error('Failed to react:', e);
     }
   };
 
@@ -108,9 +103,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMess
 
         {/* Existing Reactions */}
         {message.reactions && Object.keys(message.reactions).length > 0 && (
-          <div className={`absolute -bottom-3 ${isOwnMessage ? 'right-2' : 'left-2'} bg-rc-panel border border-rc-border rounded-full px-1.5 py-0.5 text-xs shadow-md flex gap-0.5 z-10`}>
+          <div className={`absolute -bottom-3 ${isOwnMessage ? 'right-2' : 'left-2'} bg-rc-panel/90 backdrop-blur-md border border-rc-border rounded-full px-2 py-0.5 text-[10px] shadow-md flex items-center gap-1 z-10`}>
             {Object.entries(message.reactions).map(([uid, emoji]) => (
-              <span key={uid} title={uid === currentUserId ? 'You' : 'Stranger'}>{emoji}</span>
+              <span key={uid} className="flex items-center gap-1 bg-rc-surface/60 px-1.5 py-0.5 rounded-full border border-rc-border/40">
+                <span className="text-[11px] leading-none">{emoji}</span>
+                <span className="text-[8px] font-bold text-rc-muted uppercase tracking-wider leading-none">
+                  {uid === currentUserId ? 'You' : strangerName}
+                </span>
+              </span>
             ))}
           </div>
         )}
