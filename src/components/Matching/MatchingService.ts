@@ -30,6 +30,10 @@ export const MatchingService = {
 
   findMatch: async (userId: string, userData: UserData, onMatchFound: (chatId: string) => void): Promise<() => void> => {
     if (!db) throw new Error('Firestore not initialised.');
+    
+    // Cache the exact moment the matching session began
+    const joinTime = Date.now();
+
     try {
       // 0. Check if the current user is banned.
       // Owners and admins are NEVER subject to bans — check role first.
@@ -55,14 +59,12 @@ export const MatchingService = {
         }
       }
 
-      // 1. Check if there's someone in the waiting room
+      // 1. Fetch active users in the waiting room
       const waitingRef = collection(db, 'waiting_room');
-      // Fix #10: filter out stale sessions older than 2 minutes
-      const staleThreshold = Timestamp.fromMillis(Date.now() - 2 * 60 * 1000);
+      // Fix: only query by status to avoid Firestore requiring a composite index on status + createdAt
       const q = query(
         waitingRef,
-        where('status', '==', 'waiting'),
-        where('createdAt', '>=', staleThreshold)
+        where('status', '==', 'waiting')
       );
 
       let matched = false;
@@ -71,8 +73,17 @@ export const MatchingService = {
       const querySnapshot = await getDocs(q);
       const blockedUsers = JSON.parse(localStorage.getItem('blockedUsers') || '[]');
 
+      // Fix: Filter out stale documents (older than 2 minutes) in JavaScript
+      const staleThreshold = Date.now() - 2 * 60 * 1000;
+      const validDocs = querySnapshot.docs.filter(docSnap => {
+        const wu = docSnap.data();
+        const createdAt = wu.createdAt?.toDate ? wu.createdAt.toDate().getTime() : wu.createdAt;
+        // If server timestamp is not resolved yet locally, treat it as fresh
+        return !createdAt || createdAt >= staleThreshold;
+      });
+
       // Filter and sort waiting users
-      const sortedDocs = querySnapshot.docs.filter(docSnap => {
+      const sortedDocs = validDocs.filter(docSnap => {
         const wu = docSnap.data();
         if (wu.userId === userId) return false;
         if (blockedUsers.includes(wu.userId)) return false; // Don't match with blocked users
@@ -118,6 +129,7 @@ export const MatchingService = {
           const theirBanDoc = await getDoc(theirBanRef);
           if (theirBanDoc.exists()) continue; 
 
+          let targetChatId: string | null = null;
           try {
             await runTransaction(db, async (transaction) => {
               // Read the specific waiting document in the transaction
@@ -128,6 +140,8 @@ export const MatchingService = {
 
               // Found a match! Create a new chat room
               const chatRef = doc(collection(db, 'chats'));
+              targetChatId = chatRef.id;
+              
               transaction.set(chatRef, {
                 participants: [waitingUser.userId, userId],
                 users: {
@@ -140,15 +154,15 @@ export const MatchingService = {
               });
 
               // Fix 2: delete the waiting doc atomically instead of updating it.
-              // The matchee discovers the chatId by listening on the new chats collection.
               transaction.delete(docSnapshot.ref);
-
               matched = true;
-              onMatchFound(chatRef.id);
             });
 
-            // If the transaction succeeded, we are matched, break out of loop
-            if (matched) break;
+            // If the transaction succeeded, execute callback and break loop
+            if (matched && targetChatId) {
+              onMatchFound(targetChatId);
+              break;
+            }
           } catch {
             // Transaction failed (e.g., someone else claimed this user first)
             // Continue the loop to try the next available user
@@ -160,8 +174,6 @@ export const MatchingService = {
       if (!matched) {
         // 2. No match found — add ourselves to the waiting room, then
         //    listen on the chats collection for a doc where we are a participant.
-        //    Fix 2: the matcher deletes our waiting doc atomically, so we can no
-        //    longer rely on a status-change on that doc to learn the chatId.
         const waitingDocRef = await addDoc(collection(db, 'waiting_room'), {
           userId,
           userData,
@@ -181,15 +193,24 @@ export const MatchingService = {
           }
         });
 
-        // Fix 2: primary match signal — listen for a new chat where we are a participant
+        // Fix: primary match signal — listen for a new chat where we are a participant
         const chatsRef = collection(db, 'chats');
         const chatsQ = query(chatsRef, where('participants', 'array-contains', userId));
         let chatFound = false;
+        
         const unsubChats = onSnapshot(chatsQ, (chatsSnap) => {
           if (chatFound) return;
-          const newChat = chatsSnap.docs.find(
-            d => d.data().status === 'active'
-          );
+          
+          // Fix: Prevent auto-matching to historical active chats!
+          // We only resolve matches created AFTER our queue session began (with a small 5s clock skew buffer)
+          const newChat = chatsSnap.docs.find(d => {
+            const data = d.data();
+            if (data.status !== 'active') return false;
+            
+            const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().getTime() : data.createdAt;
+            return createdAt && createdAt >= (joinTime - 5000);
+          });
+
           if (newChat) {
             chatFound = true;
             unsubChats();
