@@ -341,14 +341,6 @@ export default function Home() {
               </div>
             </div>
           </div>
-
-          {currentUser && (
-            <div className="flex items-center gap-3 text-xs text-rc-muted py-2 px-4 bg-rc-surface/30 border border-rc-border/30 rounded-xl max-w-sm w-full select-none">
-              <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" />
-              <span className="truncate">Signed in: <strong className="text-rc-text">{currentUser.email}</strong></span>
-              <button onClick={handleSignOut} type="button" className="ml-auto text-rc-accentGlow hover:underline font-bold shrink-0 cursor-pointer">Sign Out</button>
-            </div>
-          )}
         </div>
 
         {/* Right Side: Setup Card / Auth Card / Matching Screen */}
