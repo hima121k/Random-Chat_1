@@ -543,93 +543,131 @@ export default function Chat() {
       )}
 
       {/* Header */}
-      <header className="relative z-10 bg-rc-panel/95 backdrop-blur-xl border-b border-rc-border py-3 px-4 flex items-center shadow-lg">
-        <button onClick={handleLeave} className="mr-3 p-2 hover:bg-rc-surface rounded-xl transition-colors text-rc-muted hover:text-rc-text">
-          <ArrowLeft size={22} />
-        </button>
-        <div className="flex-1 flex items-center gap-3">
-          <div className="relative shrink-0">
-            {strangerData?.avatarUrl ? (
-              <img src={typeof strangerData.avatarUrl === 'string' ? strangerData.avatarUrl.replace('.glb', '.png') : ''} alt="avatar" className="w-10 h-10 rounded-full ring-2 ring-rc-accent object-cover shadow-lg shrink-0" />
-            ) : (
-              <div className={`w-10 h-10 bg-gradient-to-br ${getGenderColor(strangerData?.gender)} rounded-full flex items-center justify-center shadow-lg shrink-0`}>
-                <span className="text-white font-bold text-lg">
-                  {strangerData?.name ? strangerData.name.charAt(0).toUpperCase() : 'S'}
-                </span>
-              </div>
-            )}
-            <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-rc-panel rounded-full shadow-glowSm"></div>
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="font-semibold text-rc-text flex items-center gap-2 truncate">
-              {strangerData?.name || 'Stranger'}
-              {(strangerData?.isPro || strangerData?.role === 'owner' || strangerData?.role === 'admin') && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full border uppercase tracking-wider font-bold text-amber-400 bg-amber-500/10 border-amber-500/20 shadow-glowSm flex items-center gap-1 shrink-0">
-                  <Zap size={8} className="fill-amber-400" /> Pro Member
-                </span>
-              )}
-              {strangerData?.role === 'owner' && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full border uppercase tracking-wider font-bold text-amber-400 bg-amber-500/10 border-amber-500/20 shadow-glowSm shrink-0">
-                  👑 System Owner
-                </span>
-              )}
-              {strangerData?.role === 'admin' && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full border uppercase tracking-wider font-bold text-blue-400 bg-blue-500/10 border-blue-500/20 shadow-glowSm shrink-0">
-                  🛡️ Moderator
-                </span>
-              )}
-              {strangerData?.gender && !strangerData?.role && (
-                <span className={`text-[9px] px-1.5 py-0.5 rounded-full border uppercase tracking-wider font-bold shrink-0 ${getGenderBadgeColor(strangerData.gender)}`}>
-                  {strangerData.gender}
-                </span>
-              )}
-            </h2>
-            <div className="text-[10px] flex items-center gap-2 mt-1 text-rc-muted overflow-x-auto hide-scrollbar flex-nowrap whitespace-nowrap w-full select-none py-0.5">
-              {strangerData?.location && (
-                <span className="bg-blue-500/10 border border-blue-500/20 text-blue-300 px-2.5 py-0.5 rounded-full text-[9px] shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm transition-all duration-300 hover:bg-blue-500/20">
-                  📍 {strangerData.location}
-                </span>
-              )}
-              {strangerData?.interests && strangerData.interests.split(', ').map((interest, idx) => (
-                <span key={idx} className="bg-rc-accent/10 border border-rc-accent/20 text-rc-accentGlow px-2.5 py-0.5 rounded-full text-[9px] shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm transition-all duration-300 hover:bg-rc-accent/20">
-                  ✨ {interest}
-                </span>
-              ))}
-              {strangerData?.mood && (
-                <span className="bg-violet-500/10 border border-violet-500/20 text-violet-300 px-2.5 py-0.5 rounded-full text-[9px] shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm transition-all duration-300 hover:bg-violet-500/20">
-                  {strangerData.mood === 'Chill' && '🍃 '}{strangerData.mood === 'Curious' && '🤔 '}{strangerData.mood === 'Funny' && '😂 '}{strangerData.mood === 'Deep talk' && '🌌 '}{strangerData.mood}
-                </span>
-              )}
-              
-              {isE2eeActive ? (
-                <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2.5 py-0.5 rounded-full text-[9px] font-semibold shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm transition-all duration-300 animate-pulse-slow">
-                  <Lock size={9} /> Encrypted
-                </span>
-              ) : e2eeReady ? (
-                <span className="bg-amber-500/10 border border-amber-500/20 text-amber-400 px-2.5 py-0.5 rounded-full text-[9px] font-semibold shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm">
-                  <Lock size={9} /> Unencrypted
-                </span>
+      <header className="relative z-10 bg-rc-panel/95 backdrop-blur-xl border-b border-rc-border py-2 px-3 sm:py-3 sm:px-4 flex flex-col gap-2 sm:flex-row sm:items-center shadow-lg">
+        {/* Row 1: Left avatar/name, Right actions */}
+        <div className="flex items-center w-full sm:w-auto flex-1 min-w-0">
+          <button onClick={handleLeave} className="mr-2 p-1.5 hover:bg-rc-surface rounded-xl transition-colors text-rc-muted hover:text-rc-text shrink-0">
+            <ArrowLeft size={20} />
+          </button>
+          
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            {/* Avatar */}
+            <div className="relative shrink-0">
+              {strangerData?.avatarUrl ? (
+                <img src={typeof strangerData.avatarUrl === 'string' ? strangerData.avatarUrl.replace('.glb', '.png') : ''} alt="avatar" className="w-9 h-9 sm:w-10 sm:h-10 rounded-full ring-2 ring-rc-accent object-cover shadow-lg shrink-0" />
               ) : (
-                <span className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 px-2.5 py-0.5 rounded-full text-[9px] font-semibold shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm animate-pulse">
-                  <Lock size={9} /> Setting up...
-                </span>
+                <div className={`w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br ${getGenderColor(strangerData?.gender)} rounded-full flex items-center justify-center shadow-lg shrink-0`}>
+                  <span className="text-white font-bold text-base sm:text-lg">
+                    {strangerData?.name ? strangerData.name.charAt(0).toUpperCase() : 'S'}
+                  </span>
+                </div>
               )}
+              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-rc-panel rounded-full shadow-glowSm"></div>
             </div>
+
+            {/* Name & Badges */}
+            <div className="min-w-0 flex-1">
+              <h2 className="font-semibold text-rc-text flex flex-wrap items-center gap-1.5 text-sm sm:text-base">
+                <span className="truncate max-w-[80px] xs:max-w-[120px] sm:max-w-none">{strangerData?.name || 'Stranger'}</span>
+                {(strangerData?.isPro || strangerData?.role === 'owner' || strangerData?.role === 'admin') && (
+                  <span className="text-[8px] sm:text-[9px] px-1.5 py-0.5 rounded-full border uppercase tracking-wider font-bold text-amber-400 bg-amber-500/10 border-amber-500/20 shadow-glowSm flex items-center gap-0.5 shrink-0">
+                    <Zap size={7} className="fill-amber-400" /> Pro
+                  </span>
+                )}
+                {strangerData?.gender && !strangerData?.role && (
+                  <span className={`text-[8px] sm:text-[9px] px-1.5 py-0.5 rounded-full border uppercase tracking-wider font-bold shrink-0 ${getGenderBadgeColor(strangerData.gender)}`}>
+                    {strangerData.gender}
+                  </span>
+                )}
+              </h2>
+              {/* E2EE / Status text for Row 1 on mobile */}
+              <div className="flex sm:hidden items-center text-[10px] mt-0.5">
+                {isE2eeActive ? (
+                  <span className="text-emerald-400 flex items-center gap-0.5 font-medium">
+                    <Lock size={8} /> Encrypted
+                  </span>
+                ) : e2eeReady ? (
+                  <span className="text-amber-400 flex items-center gap-0.5 font-medium">
+                    <Lock size={8} /> Unencrypted
+                  </span>
+                ) : (
+                  <span className="text-yellow-400 flex items-center gap-0.5 font-medium animate-pulse">
+                    <Lock size={8} /> Setting up...
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Action buttons (rendered next to name on mobile) */}
+          <div className="flex items-center gap-1 ml-auto sm:hidden shrink-0">
+            <button onClick={handleStartCall} disabled={inCall || incomingCall}
+              className="p-1.5 hover:bg-rc-surface rounded-xl transition-colors text-rc-muted hover:text-rc-accentGlow disabled:opacity-40">
+              <Video size={18} />
+            </button>
+            <button onClick={() => setShowReportModal(true)} title="Report User"
+              className="p-1.5 hover:bg-red-500/10 rounded-xl transition-colors text-rc-muted hover:text-red-400">
+              <Flag size={16} />
+            </button>
+            <button onClick={handleSwap}
+              className="text-[10px] bg-gradient-to-r from-rc-surface to-rc-bg border border-rc-border hover:border-rc-accent/50 px-2 py-1 rounded-xl text-rc-text transition-all font-semibold shadow-glowSm">
+              Skip ➔
+            </button>
           </div>
         </div>
 
-        <button onClick={handleStartCall} disabled={inCall || incomingCall}
-          className="p-2 mr-1 hover:bg-rc-surface rounded-xl transition-colors text-rc-muted hover:text-rc-accentGlow disabled:opacity-40">
-          <Video size={20} />
-        </button>
-        <button onClick={() => setShowReportModal(true)} title="Report User"
-          className="p-2 mr-1 hover:bg-red-500/10 rounded-xl transition-colors text-rc-muted hover:text-red-400">
-          <Flag size={18} />
-        </button>
-        <button onClick={handleSwap}
-          className="text-xs bg-gradient-to-r from-rc-surface to-rc-bg border border-rc-border hover:border-rc-accent/50 px-3 py-1.5 rounded-xl text-rc-text transition-all font-semibold shadow-glowSm flex items-center gap-1">
-          Skip ➔
-        </button>
+        {/* Row 2: Tags list (Location, Interests, Mood, E2EE status).
+            On mobile, it spans full width. On desktop, it resides next to the name. */}
+        <div className="text-[10px] flex items-center gap-2 text-rc-muted overflow-x-auto hide-scrollbar flex-nowrap whitespace-nowrap w-full sm:w-auto py-0.5 select-none sm:ml-12">
+          {strangerData?.location && (
+            <span className="bg-blue-500/10 border border-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full text-[9px] shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm transition-all duration-300 hover:bg-blue-500/20">
+              📍 {strangerData.location}
+            </span>
+          )}
+          {strangerData?.interests && strangerData.interests.split(', ').map((interest, idx) => (
+            <span key={idx} className="bg-rc-accent/10 border border-rc-accent/20 text-rc-accentGlow px-2.5 py-0.5 rounded-full text-[9px] shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm transition-all duration-300 hover:bg-rc-accent/20">
+              ✨ {interest}
+            </span>
+          ))}
+          {strangerData?.mood && (
+            <span className="bg-violet-500/10 border border-violet-500/20 text-violet-300 px-2 py-0.5 rounded-full text-[9px] shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm transition-all duration-300 hover:bg-violet-500/20">
+              {strangerData.mood === 'Chill' && '🍃 '}{strangerData.mood === 'Curious' && '🤔 '}{strangerData.mood === 'Funny' && '😂 '}{strangerData.mood === 'Deep talk' && '🌌 '}{strangerData.mood}
+            </span>
+          )}
+          
+          {/* Only render E2EE badge on desktop tags row since it's already on Row 1 on mobile */}
+          <span className="hidden sm:inline-flex">
+            {isE2eeActive ? (
+              <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2.5 py-0.5 rounded-full text-[9px] font-semibold shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm transition-all duration-300 animate-pulse-slow">
+                <Lock size={9} /> Encrypted
+              </span>
+            ) : e2eeReady ? (
+              <span className="bg-amber-500/10 border border-amber-500/20 text-amber-400 px-2.5 py-0.5 rounded-full text-[9px] font-semibold shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm">
+                <Lock size={9} /> Unencrypted
+              </span>
+            ) : (
+              <span className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 px-2.5 py-0.5 rounded-full text-[9px] font-semibold shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm animate-pulse">
+                <Lock size={9} /> Setting up...
+              </span>
+            )}
+          </span>
+        </div>
+
+        {/* Desktop Actions Row */}
+        <div className="hidden sm:flex items-center gap-1 shrink-0 ml-auto">
+          <button onClick={handleStartCall} disabled={inCall || incomingCall}
+            className="p-2 mr-1 hover:bg-rc-surface rounded-xl transition-colors text-rc-muted hover:text-rc-accentGlow disabled:opacity-40">
+            <Video size={20} />
+          </button>
+          <button onClick={() => setShowReportModal(true)} title="Report User"
+            className="p-2 mr-1 hover:bg-red-500/10 rounded-xl transition-colors text-rc-muted hover:text-red-400">
+            <Flag size={18} />
+          </button>
+          <button onClick={handleSwap}
+            className="text-xs bg-gradient-to-r from-rc-surface to-rc-bg border border-rc-border hover:border-rc-accent/50 px-3 py-1.5 rounded-xl text-rc-text transition-all font-semibold shadow-glowSm flex items-center gap-1">
+            Skip ➔
+          </button>
+        </div>
       </header>
 
       {/* Chat Area */}
