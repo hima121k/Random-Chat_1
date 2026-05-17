@@ -57,6 +57,13 @@ export default function Home() {
       }
 
       if (user) {
+        // Fetch ID token and set it in MatchingService for beacon requests
+        user.getIdToken().then(token => {
+          MatchingService.idToken = token;
+        }).catch(err => {
+          console.error("Error setting MatchingService idToken:", err);
+        });
+
         // Step 1: Check providers for phone verification requirement
         const providers = user.providerData.map(p => p.providerId);
         const hasEmailAuth = providers.includes('password');
@@ -99,6 +106,7 @@ export default function Home() {
       } else {
         setRequiresPhoneVerification(false);
         setSubscription({ isPro: false });
+        MatchingService.idToken = null;
       }
     });
 
@@ -257,8 +265,30 @@ export default function Home() {
   }, [name, gender, age, avatarUrl, navigate, currentUser, matchGender, subscription.isPro, mood, locationStr, interestsStr])
 
   useEffect(() => {
-    // Fix 1: only leave the queue on unmount if we never found a match
+    const handleTabClose = () => {
+      if (isMatching && currentUser && !matchedRef.current) {
+        MatchingService.leaveQueueBeacon(currentUser.uid)
+      }
+    }
+
+    const handleBeforeUnload = () => {
+      handleTabClose()
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        handleTabClose()
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
     return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+
+      // Fix 1: only leave the queue on unmount if we never found a match
       if (isMatching && currentUser && !matchedRef.current) {
         MatchingService.leaveQueue(currentUser.uid)
       }

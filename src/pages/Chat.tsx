@@ -86,10 +86,22 @@ export default function Chat() {
   const [isAuthLoading, setIsAuthLoading] = useState(!auth?.currentUser)
   const currentUserId = currentUser?.uid
 
+  const idTokenRef = useRef<string | null>(null)
+
   useEffect(() => {
-    return onAuthStateChanged(auth, (user) => {
+    return onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user)
       setIsAuthLoading(false)
+      if (user) {
+        try {
+          const token = await user.getIdToken()
+          idTokenRef.current = token
+        } catch (err) {
+          console.error('Error fetching token:', err)
+        }
+      } else {
+        idTokenRef.current = null
+      }
     })
   }, [])
 
@@ -367,6 +379,54 @@ export default function Chat() {
     if (chatId) try { await updateDoc(doc(db, 'chats', chatId), { status: 'ended' }) } catch { /* ignore */ }
     navigate('/', { state: { autoStart: true } })
   }
+
+  const handleTabClose = useCallback(() => {
+    if (isLeavingRef.current || !chatId || !currentUserId) return
+    isLeavingRef.current = true
+
+    // 1. Local update Doc (best effort if page doesn't close immediately)
+    updateDoc(doc(db, 'chats', chatId), { status: 'ended' }).catch(() => {})
+
+    // 2. Keepalive REST PATCH fetch (guarantees the end status write even during hard tab close!)
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID
+    const token = idTokenRef.current
+    if (projectId && token) {
+      const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/chats/${chatId}?updateMask.fieldPaths=status`
+      fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          fields: {
+            status: { stringValue: 'ended' }
+          }
+        }),
+        keepalive: true
+      }).catch(() => {})
+    }
+  }, [chatId, currentUserId])
+
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      handleTabClose()
+    }
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        handleTabClose()
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [handleTabClose])
 
   const handleConfirmReport = async () => {
     if (!strangerData?.id || !currentUserId || !db || isReporting) return

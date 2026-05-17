@@ -25,6 +25,9 @@ export interface ChatRoom {
 }
 
 export const MatchingService = {
+  activeWaitingDocId: null as string | null,
+  idToken: null as string | null,
+
   findMatch: async (userId: string, userData: UserData, onMatchFound: (chatId: string) => void): Promise<() => void> => {
     if (!db) throw new Error('Firestore not initialised.');
     try {
@@ -165,6 +168,9 @@ export const MatchingService = {
           status: 'waiting',
           createdAt: serverTimestamp()
         });
+        
+        // Cache the waiting room document ID for tab-close beacon support!
+        MatchingService.activeWaitingDocId = waitingDocRef.id;
 
         // Watch our own waiting doc — if it still exists and gets deleted it means
         // we were matched; fall back to the chats listener below.
@@ -189,6 +195,7 @@ export const MatchingService = {
             unsubChats();
             unsubWaiting();
             // Clean up our waiting room doc in case it wasn't deleted yet
+            MatchingService.activeWaitingDocId = null;
             deleteDoc(waitingDocRef).catch(() => {});
             onMatchFound(newChat.id);
           }
@@ -207,6 +214,7 @@ export const MatchingService = {
   },
 
   leaveQueue: async (userId: string) => {
+    MatchingService.activeWaitingDocId = null;
     if (!db) return;
     try {
       const q = query(collection(db, 'waiting_room'), where('userId', '==', userId), where('status', '==', 'waiting'));
@@ -215,6 +223,24 @@ export const MatchingService = {
       await Promise.all(querySnapshot.docs.map(d => deleteDoc(d.ref)));
     } catch (error) {
       console.error("Error leaving queue:", error);
+    }
+  },
+
+  leaveQueueBeacon: (userId: string) => {
+    MatchingService.leaveQueue(userId).catch(() => {});
+    const docId = MatchingService.activeWaitingDocId;
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID;
+    const token = MatchingService.idToken;
+    if (docId && projectId && token) {
+      const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/waiting_room/${docId}`;
+      fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        keepalive: true
+      }).catch(() => {});
+      MatchingService.activeWaitingDocId = null;
     }
   }
 };
