@@ -586,27 +586,27 @@ export default function Chat() {
             </h2>
             <div className="text-[11px] flex items-center gap-1 mt-0.5 text-rc-muted flex-wrap">
               {strangerData?.location && (
-                <span className="bg-rc-surface border border-rc-border px-1.5 py-0.5 rounded text-[10px]">📍 {strangerData.location}</span>
+                <span className="hidden sm:inline-flex bg-rc-surface border border-rc-border px-1.5 py-0.5 rounded text-[10px]">📍 {strangerData.location}</span>
               )}
               {strangerData?.interests && strangerData.interests.split(', ').map((interest, idx) => (
-                <span key={idx} className="bg-rc-surface border border-rc-border px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap">✨ {interest}</span>
+                <span key={idx} className="hidden sm:inline-flex bg-rc-surface border border-rc-border px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap">✨ {interest}</span>
               ))}
               {strangerData?.mood && (
-                <span className="bg-rc-surface border border-rc-border px-1.5 py-0.5 rounded text-[10px]">
+                <span className="hidden sm:inline-flex bg-rc-surface border border-rc-border px-1.5 py-0.5 rounded text-[10px]">
                   {strangerData.mood === 'Chill' && '🍃 '}{strangerData.mood === 'Curious' && '🤔 '}{strangerData.mood === 'Funny' && '😂 '}{strangerData.mood === 'Deep talk' && '🌌 '}{strangerData.mood}
                 </span>
               )}
               
               {isE2eeActive ? (
-                <span className="text-emerald-400 flex items-center gap-1 ml-1">
+                <span className="text-emerald-400 flex items-center gap-1 ml-1 shrink-0">
                   <Lock size={9} /> Encrypted
                 </span>
               ) : e2eeReady ? (
-                <span className="text-amber-400 flex items-center gap-1 ml-1">
+                <span className="text-amber-400 flex items-center gap-1 ml-1 shrink-0">
                   <Lock size={9} /> Unencrypted
                 </span>
               ) : (
-                <span className="text-yellow-400 flex items-center gap-1 ml-1">
+                <span className="text-yellow-400 flex items-center gap-1 ml-1 shrink-0">
                   <Lock size={9} /> Setting up...
                 </span>
               )}
