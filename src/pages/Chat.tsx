@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { ArrowLeft, Video, PhoneOff, Phone, Flag, AlertTriangle, Lock, Zap, X } from 'lucide-react'
 import {
   collection, query, orderBy, onSnapshot, addDoc, serverTimestamp,
-  doc, updateDoc, setDoc, onSnapshot as onSnap, Timestamp
+  doc, updateDoc, setDoc, onSnapshot as onSnap, Timestamp, deleteField
 } from 'firebase/firestore'
 import { db as _db, auth as _auth } from '../lib/firebase'
 // App.tsx only renders this page when VITE_FIREBASE_API_KEY is set, so
@@ -81,6 +81,7 @@ export default function Chat() {
   const isLeavingRef = useRef(false)
   const strangerUnsubRef = useRef<(() => void) | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const disconnectTimerRef = useRef<number | null>(null)
   
   const [currentUser, setCurrentUser] = useState<User | null>(auth?.currentUser || null)
   const [isAuthLoading, setIsAuthLoading] = useState(!auth?.currentUser)
@@ -236,6 +237,21 @@ export default function Chat() {
           setPeerTyping(false)
         }
 
+        // Check for temporary disconnect flag
+        const otherId = data.participants.find((id: string) => id !== currentUserId)
+        if (otherId && data[`leftAt_${otherId}`]) {
+          if (!disconnectTimerRef.current) {
+            disconnectTimerRef.current = window.setTimeout(() => {
+              updateDoc(doc(db, 'chats', chatId), { status: 'ended' }).catch(() => {})
+            }, 3000)
+          }
+        } else {
+          if (disconnectTimerRef.current) {
+            window.clearTimeout(disconnectTimerRef.current)
+            disconnectTimerRef.current = null
+          }
+        }
+
         // Fix 3: only redirect on a server-confirmed ended status
         if (data.status === 'ended' && !isLeavingRef.current) navigate('/', { state: { autoStart: true } })
       } else {
@@ -379,6 +395,51 @@ export default function Chat() {
     if (chatId) try { await updateDoc(doc(db, 'chats', chatId), { status: 'ended' }) } catch { /* ignore */ }
     navigate('/', { state: { autoStart: true } })
   }
+
+  // 1. Clear disconnect flag on mount (handles successful refresh reconnects)
+  useEffect(() => {
+    if (chatId && currentUserId) {
+      updateDoc(doc(db, 'chats', chatId), { [`leftAt_${currentUserId}`]: deleteField() }).catch(() => {})
+    }
+  }, [chatId, currentUserId])
+
+  // 2. Tab close / refresh disconnect beacon
+  const handleTabClose = useCallback(() => {
+    if (isLeavingRef.current || !chatId || !currentUserId) return
+
+    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID
+    const token = idTokenRef.current
+    if (projectId && token) {
+      const fieldName = `leftAt_${currentUserId}`
+      const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/chats/${chatId}?updateMask.fieldPaths=${fieldName}`
+      fetch(url, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          fields: {
+            [fieldName]: { timestampValue: new Date().toISOString() }
+          }
+        }),
+        keepalive: true
+      }).catch(() => {})
+    }
+  }, [chatId, currentUserId])
+
+  useEffect(() => {
+    const handleBeforeUnload = () => handleTabClose()
+    const handlePageHide = () => handleTabClose()
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    window.addEventListener('pagehide', handlePageHide)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      window.removeEventListener('pagehide', handlePageHide)
+    }
+  }, [handleTabClose])
 
 
 
