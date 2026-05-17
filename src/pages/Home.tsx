@@ -282,7 +282,7 @@ export default function Home() {
 
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 relative overflow-hidden">
+    <div className="flex flex-col items-center justify-center min-h-screen p-4 relative overflow-y-auto overflow-x-hidden">
 
       {/* Decorative orbs */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
@@ -620,31 +620,59 @@ export default function Home() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-rc-muted mb-2 uppercase tracking-wider">Interests (Select up to 3)</label>
-                <div className="flex flex-wrap gap-2">
-                  {['Gaming 🎮', 'Music 🎵', 'Movies 🍿', 'Tech 💻', 'Sports 🏀', 'Anime 🌸', 'Books 📚', 'Travel ✈️', 'Art 🎨', 'Fitness 💪'].map(int => {
-                    const selected = interestsStr.includes(int);
-                    return (
-                      <button
-                        key={int}
-                        type="button"
-                        onClick={() => {
-                          const current = interestsStr ? interestsStr.split(', ') : [];
-                          if (selected) {
-                            setInterestsStr(current.filter(i => i !== int).join(', '));
-                          } else if (current.length < 3) {
-                            setInterestsStr([...current, int].join(', '));
-                          }
-                        }}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
-                          selected
-                            ? 'bg-rc-accent/20 border-rc-accent/60 text-rc-accentGlow shadow-glowSm'
-                            : 'bg-rc-bg/60 border-rc-border text-rc-muted hover:border-rc-border/80'
-                        }`}
-                      >
-                        {int}
-                      </button>
-                    )
-                  })}
+                <div className="flex flex-col gap-2">
+                  <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
+                    {['Gaming 🎮', 'Music 🎵', 'Movies 🍿', 'Tech 💻', 'Sports 🏀'].map(int => {
+                      const selected = interestsStr.includes(int);
+                      return (
+                        <button
+                          key={int}
+                          type="button"
+                          onClick={() => {
+                            const current = interestsStr ? interestsStr.split(', ') : [];
+                            if (selected) {
+                              setInterestsStr(current.filter(i => i !== int).join(', '));
+                            } else if (current.length < 3) {
+                              setInterestsStr([...current, int].join(', '));
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors shrink-0 ${
+                            selected
+                              ? 'bg-rc-accent/20 border-rc-accent/60 text-rc-accentGlow shadow-glowSm'
+                              : 'bg-rc-bg/60 border-rc-border text-rc-muted hover:border-rc-border/80'
+                          }`}
+                        >
+                          {int}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
+                    {['Anime 🌸', 'Books 📚', 'Travel ✈️', 'Art 🎨', 'Fitness 💪'].map(int => {
+                      const selected = interestsStr.includes(int);
+                      return (
+                        <button
+                          key={int}
+                          type="button"
+                          onClick={() => {
+                            const current = interestsStr ? interestsStr.split(', ') : [];
+                            if (selected) {
+                              setInterestsStr(current.filter(i => i !== int).join(', '));
+                            } else if (current.length < 3) {
+                              setInterestsStr([...current, int].join(', '));
+                            }
+                          }}
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors shrink-0 ${
+                            selected
+                              ? 'bg-rc-accent/20 border-rc-accent/60 text-rc-accentGlow shadow-glowSm'
+                              : 'bg-rc-bg/60 border-rc-border text-rc-muted hover:border-rc-border/80'
+                          }`}
+                        >
+                          {int}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
