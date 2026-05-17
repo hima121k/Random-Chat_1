@@ -34,7 +34,7 @@ interface Message {
   text: string;
   senderId: string;
   createdAt: Timestamp | null;
-  reactions?: string[];
+  reactions?: Record<string, string>;
   isRead?: boolean;
 }
 
@@ -262,7 +262,7 @@ export default function Chat() {
       const decrypted = await Promise.all(
         rawMsgs.map(async (raw): Promise<Message> => {
           const anyRaw = raw as unknown as Record<string, unknown>
-          const reactions = anyRaw.reactions as string[] | undefined
+          const reactions = anyRaw.reactions as Record<string, string> | undefined
           const isRead = !!anyRaw.isRead
 
           // Mark as read if from stranger

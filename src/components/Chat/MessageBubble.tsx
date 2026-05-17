@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Timestamp, doc, updateDoc, arrayUnion } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { Timestamp, doc, updateDoc, deleteField } from 'firebase/firestore';
+import { db, auth } from '../../lib/firebase';
 import { Check, CheckCheck } from 'lucide-react';
 
 export interface Message {
@@ -8,7 +8,7 @@ export interface Message {
   text: string;
   senderId: string;
   createdAt: Timestamp | null;
-  reactions?: string[];
+  reactions?: Record<string, string>;
   isRead?: boolean;
 }
 
@@ -21,16 +21,28 @@ interface MessageBubbleProps {
 export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, chatId }) => {
   const [showReactions, setShowReactions] = useState(false);
 
+  const currentUserId = auth.currentUser?.uid || '';
+
   const timeString = message.createdAt?.toDate
     ? message.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     : '';
 
   const handleReact = async (emoji: string) => {
     setShowReactions(false);
-    if (!chatId || !message.id) return;
+    if (!chatId || !message.id || !currentUserId) return;
     try {
       const msgRef = doc(db, 'chats', chatId, 'messages', message.id);
-      await updateDoc(msgRef, { reactions: arrayUnion(emoji) });
+      if (message.reactions?.[currentUserId] === emoji) {
+        // Toggle off (remove reaction)
+        await updateDoc(msgRef, {
+          [`reactions.${currentUserId}`]: deleteField()
+        });
+      } else {
+        // Set / Replace reaction (WhatsApp one select option system)
+        await updateDoc(msgRef, {
+          [`reactions.${currentUserId}`]: emoji
+        });
+      }
     } catch (e) {
       console.error('Failed to react:', e);
     }
@@ -64,17 +76,20 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMess
         </div>
 
         {/* Existing Reactions */}
-        {message.reactions && message.reactions.length > 0 && (
+        {message.reactions && Object.keys(message.reactions).length > 0 && (
           <div className={`absolute -bottom-3 ${isOwnMessage ? 'right-2' : 'left-2'} bg-rc-panel border border-rc-border rounded-full px-1.5 py-0.5 text-xs shadow-md flex gap-0.5 z-10`}>
-            {message.reactions.map((emoji, i) => (
-              <span key={i}>{emoji}</span>
+            {Object.entries(message.reactions).map(([uid, emoji]) => (
+              <span key={uid} title={uid === currentUserId ? 'You' : 'Stranger'}>{emoji}</span>
             ))}
           </div>
         )}
 
         {/* Hover Reaction Menu (Floating above bubble) */}
         {!isOwnMessage && showReactions && (
-          <div className="absolute -top-10 left-2 bg-rc-panel border border-rc-border rounded-full px-2.5 py-1 flex gap-1.5 shadow-lg z-20 animate-fade-in">
+          <div 
+            style={{ transform: 'translateY(-100%)', top: '-6px' }}
+            className="absolute left-2 bg-rc-panel border border-rc-border rounded-full px-2.5 py-1 flex gap-1.5 shadow-lg z-20 animate-fade-in"
+          >
             {['👍', '😂', '❤️', '😲'].map(emoji => (
               <button key={emoji} onClick={(e) => { e.stopPropagation(); handleReact(emoji); }} className="hover:scale-125 transition-transform text-base cursor-pointer">
                 {emoji}
