@@ -19,8 +19,8 @@ const firebaseConfig = {
 };
 
 const app = firebaseConfig.apiKey ? initializeApp(firebaseConfig) : null;
-export const auth: Auth | null = app ? getAuth(app) : null;
-export const db: Firestore | null = app ? getFirestore(app) : null;
+export const auth = (app ? getAuth(app) : null) as Auth;
+export const db = (app ? getFirestore(app) : null) as Firestore;
 const googleProvider = new GoogleAuthProvider();
 
 // ── Google Sign-In ──────────────────────────────────────────────

@@ -10,7 +10,7 @@ import { db as _db, auth as _auth } from '../lib/firebase'
 // db and auth are always initialised here. Assert non-null once.
 import type { Firestore } from 'firebase/firestore'
 import type { Auth } from 'firebase/auth'
-import { onAuthStateChanged } from 'firebase/auth'
+import { onAuthStateChanged, type User } from 'firebase/auth'
 const db = _db as Firestore
 const auth = _auth as Auth
 
@@ -41,7 +41,8 @@ interface RawMessage {
   createdAt: Timestamp | null;
 }
 
-let currentChatSessionId: string | null = null;
+// Track the current chat session to detect transitions
+let lastNavigatedChatId: string | null = null;
 
 export default function Chat() {
   const { chatId } = useParams<{ chatId: string }>()
@@ -72,6 +73,7 @@ export default function Chat() {
 
   const isLeavingRef = useRef(false)
   const strangerUnsubRef = useRef<(() => void) | null>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
   
   const [currentUser, setCurrentUser] = useState<User | null>(auth?.currentUser || null)
   const [isAuthLoading, setIsAuthLoading] = useState(!auth?.currentUser)
@@ -145,23 +147,22 @@ export default function Chat() {
   useEffect(() => {
     if (!chatId) { navigate('/'); return }
 
-    if (currentChatSessionId !== chatId) {
-      if (sessionStorage.getItem('valid_chat_navigation') !== 'true') {
-        console.warn('Page refresh detected. Redirecting to home to start a new chat.')
-        // Wait for auth to initialize so we have permissions to end the chat
+    // If this is a new navigation (not a refresh), verify it came from Home
+    if (lastNavigatedChatId !== chatId) {
+      const activeId = sessionStorage.getItem('active_chat_id');
+      if (activeId !== chatId) {
+        console.warn('Unauthorized chat access or stale session. Redirecting to home.');
         const unsub = onAuthStateChanged(auth, async (user) => {
           unsub()
           if (user && chatId) {
-            try { await updateDoc(doc(db, 'chats', chatId), { status: 'ended' }) } catch (err) { console.error("Failed to end chat on refresh:", err); }
+            try { await updateDoc(doc(db, 'chats', chatId), { status: 'ended' }) } catch (err) { console.error("Failed to end chat:", err); }
           }
           navigate('/', { replace: true })
         })
-        // Fallback timeout in case auth hangs
         setTimeout(() => navigate('/', { replace: true }), 1500)
         return
       }
-      currentChatSessionId = chatId
-      sessionStorage.removeItem('valid_chat_navigation')
+      lastNavigatedChatId = chatId
     }
 
     if (isAuthLoading) return;
@@ -210,6 +211,8 @@ export default function Chat() {
       } else {
         if (!isLeavingRef.current) navigate('/')
       }
+    }, (err) => {
+      console.error('Chat snapshot error:', err);
     })
 
     return () => { 
@@ -381,7 +384,7 @@ export default function Chat() {
         <div className="absolute top-20 left-4 right-4 z-40 glass rounded-2xl shadow-2xl p-4 flex items-center justify-between animate-bounce">
           <div className="flex items-center gap-3">
             {strangerData?.avatarUrl ? (
-              <img src={strangerData.avatarUrl.replace('.glb', '.png')} alt="avatar" className="w-12 h-12 rounded-full ring-2 ring-rc-accent object-cover shadow-lg animate-pulse" />
+              <img src={typeof strangerData.avatarUrl === 'string' ? strangerData.avatarUrl.replace('.glb', '.png') : ''} alt="avatar" className="w-12 h-12 rounded-full ring-2 ring-rc-accent object-cover shadow-lg animate-pulse" />
             ) : (
               <div className={`w-12 h-12 bg-gradient-to-br ${getGenderColor(strangerData?.gender)} rounded-full flex items-center justify-center shadow-lg animate-pulse`}>
                 <Video className="text-white" size={20} />
@@ -475,7 +478,7 @@ export default function Chat() {
         </button>
         <div className="flex-1 flex items-center gap-3">
           {strangerData?.avatarUrl ? (
-            <img src={strangerData.avatarUrl.replace('.glb', '.png')} alt="avatar" className="w-10 h-10 rounded-full ring-2 ring-rc-accent object-cover shadow-lg shrink-0" />
+            <img src={typeof strangerData.avatarUrl === 'string' ? strangerData.avatarUrl.replace('.glb', '.png') : ''} alt="avatar" className="w-10 h-10 rounded-full ring-2 ring-rc-accent object-cover shadow-lg shrink-0" />
           ) : (
             <div className={`w-10 h-10 bg-gradient-to-br ${getGenderColor(strangerData?.gender)} rounded-full flex items-center justify-center shadow-lg shrink-0`}>
               <span className="text-white font-bold text-lg">

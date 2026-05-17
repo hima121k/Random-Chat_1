@@ -1,4 +1,4 @@
-import { useState, useEffect, ReactNode } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
 import { auth } from '../../lib/firebase';
 import { getUserRole, type Role } from '../../services/admin';

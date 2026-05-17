@@ -5,6 +5,7 @@ import { Footer } from './components/Navigation/Footer'
 import { RoleRoute } from './components/Navigation/RoleRoute'
 import { subscribeToAnnouncement } from './services/admin'
 import { Volume2 } from 'lucide-react'
+import { ErrorBoundary } from './components/Navigation/ErrorBoundary'
 
 const Home = lazy(() => import('./pages/Home'))
 const Chat = lazy(() => import('./pages/Chat'))
@@ -66,20 +67,22 @@ function App() {
         </div>
       )}
       <main className="flex-1 flex flex-col">
-        <Suspense fallback={<div className="flex items-center justify-center flex-1"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-rc-accent"></div></div>}>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/pricing" element={<Pricing />} />
-            <Route path="/chat/:chatId" element={<Chat />} />
-            <Route path="/terms" element={<Terms />} />
-            <Route path="/privacy" element={<Privacy />} />
-            <Route path="/admin" element={
-              <RoleRoute allowedRoles={['admin', 'owner']}>
-                <AdminDashboard />
-              </RoleRoute>
-            } />
-          </Routes>
-        </Suspense>
+        <ErrorBoundary>
+          <Suspense fallback={<div className="flex items-center justify-center flex-1"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-rc-accent"></div></div>}>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/pricing" element={<Pricing />} />
+              <Route path="/chat/:chatId" element={<Chat />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/admin" element={
+                <RoleRoute allowedRoles={['admin', 'owner']}>
+                  <AdminDashboard />
+                </RoleRoute>
+              } />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
       </main>
       {!isChatRoute && <Footer />}
     </div>

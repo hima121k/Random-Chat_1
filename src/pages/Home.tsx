@@ -228,7 +228,7 @@ export default function Home() {
       }, (chatId) => {
         matchedRef.current = true  // Fix 1: mark as matched before navigating
         setIsMatching(false)
-        sessionStorage.setItem('valid_chat_navigation', 'true')
+        sessionStorage.setItem('active_chat_id', chatId)
         navigate(`/chat/${chatId}`)
       })
     } catch (err) {
