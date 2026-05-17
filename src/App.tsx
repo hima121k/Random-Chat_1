@@ -56,7 +56,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-rc-bg text-rc-text font-sans flex flex-col">
+    <div className={`bg-rc-bg text-rc-text font-sans flex flex-col ${isChatRoute ? 'h-screen max-h-screen overflow-hidden' : 'min-h-screen'}`}>
       <Navbar />
       {announcement && (
         <div className="bg-gradient-to-r from-amber-500/20 to-orange-500/20 border-b border-amber-500/30 px-4 py-3 flex items-center justify-center gap-3">
@@ -66,7 +66,7 @@ function App() {
           </p>
         </div>
       )}
-      <main className="flex-1 flex flex-col">
+      <main className={`flex-1 flex flex-col ${isChatRoute ? 'overflow-hidden' : ''}`}>
         <ErrorBoundary>
           <Suspense fallback={<div className="flex items-center justify-center flex-1"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-rc-accent"></div></div>}>
             <Routes>
