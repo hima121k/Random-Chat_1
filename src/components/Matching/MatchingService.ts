@@ -79,7 +79,7 @@ export const MatchingService = {
         return !createdAt || createdAt >= staleThreshold;
       });
 
-      // Filter and sort waiting users
+      // Filter and sort waiting users using a highly sophisticated multi-dimensional scoring algorithm
       const sortedDocs = validDocs.filter(docSnap => {
         const wu = docSnap.data();
         if (wu.userId === userId) return false;
@@ -99,20 +99,41 @@ export const MatchingService = {
         const wuA = a.data();
         const wuB = b.data();
 
-        // 1. Prioritize Pro Users
-        const prioA = wuA.userData?.isPro ? 1 : 0;
-        const prioB = wuB.userData?.isPro ? 1 : 0;
-        if (prioA !== prioB) return prioB - prioA;
+        const getMatchScore = (otherUser: UserData) => {
+          let score = 0;
 
-        // 2. Age difference
-        const ageA = wuA.userData?.age || 0;
-        const ageB = wuB.userData?.age || 0;
-        const diffA = Math.abs(ageA - userData.age);
-        const diffB = Math.abs(ageB - userData.age);
-        if (diffA !== diffB) return diffA - diffB;
+          // 1. Pro Status Boost (Premium Priority Matchmaking)
+          if (otherUser.isPro) score += 500;
 
-        // 3. Tie-breaker: older first
-        return ageB - ageA;
+          // 2. Shared Interests Matching (100 points per overlapping interest)
+          if (userData.interests && otherUser.interests) {
+            const myInterests = userData.interests.toLowerCase().split(/[,\s]+/).map(i => i.trim()).filter(Boolean);
+            const theirInterests = otherUser.interests.toLowerCase().split(/[,\s]+/).map(i => i.trim()).filter(Boolean);
+            const shared = myInterests.filter(i => theirInterests.includes(i));
+            score += shared.length * 100;
+          }
+
+          // 3. Mood Matching (50 points for same emotional vibe)
+          if (userData.mood && otherUser.mood && userData.mood.toLowerCase() === otherUser.mood.toLowerCase()) {
+            score += 50;
+          }
+
+          // 4. Location Proximity (30 points for matching country/city)
+          if (userData.location && otherUser.location && userData.location.toLowerCase() === otherUser.location.toLowerCase()) {
+            score += 30;
+          }
+
+          // 5. Age Proximity (Deduct 10 points per year of age difference)
+          const ageDiff = Math.abs((userData.age || 0) - (otherUser.age || 0));
+          score -= ageDiff * 10;
+
+          return score;
+        };
+
+        const scoreA = getMatchScore(wuA.userData || {});
+        const scoreB = getMatchScore(wuB.userData || {});
+
+        return scoreB - scoreA; // Sort highest match score first!
       });
 
       for (const docSnapshot of sortedDocs) {
