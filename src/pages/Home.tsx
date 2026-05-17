@@ -275,18 +275,16 @@ export default function Home() {
       handleTabClose()
     }
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        handleTabClose()
-      }
+    const handlePageHide = () => {
+      handleTabClose()
     }
 
     window.addEventListener('beforeunload', handleBeforeUnload)
-    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('pagehide', handlePageHide)
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('pagehide', handlePageHide)
 
       // Fix 1: only leave the queue on unmount if we never found a match
       if (isMatching && currentUser && !matchedRef.current) {

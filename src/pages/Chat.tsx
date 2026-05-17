@@ -413,18 +413,16 @@ export default function Chat() {
       handleTabClose()
     }
 
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden') {
-        handleTabClose()
-      }
+    const handlePageHide = () => {
+      handleTabClose()
     }
 
     window.addEventListener('beforeunload', handleBeforeUnload)
-    document.addEventListener('visibilitychange', handleVisibilityChange)
+    window.addEventListener('pagehide', handlePageHide)
 
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload)
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('pagehide', handlePageHide)
     }
   }, [handleTabClose])
 
