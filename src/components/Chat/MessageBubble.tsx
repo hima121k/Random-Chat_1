@@ -86,15 +86,14 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMess
 
         {/* Hover Reaction Menu (Floating above bubble) */}
         {!isOwnMessage && showReactions && (
-          <div 
-            style={{ transform: 'translateY(-100%)', top: '-6px' }}
-            className="absolute left-2 bg-rc-panel border border-rc-border rounded-full px-2.5 py-1 flex gap-1.5 shadow-lg z-20 animate-fade-in"
-          >
-            {['👍', '😂', '❤️', '😲'].map(emoji => (
-              <button key={emoji} onClick={(e) => { e.stopPropagation(); handleReact(emoji); }} className="hover:scale-125 transition-transform text-base cursor-pointer">
-                {emoji}
-              </button>
-            ))}
+          <div className="absolute bottom-full left-2 pb-2 z-20 animate-fade-in">
+            <div className="bg-rc-panel border border-rc-border rounded-full px-2.5 py-1 flex gap-1.5 shadow-lg">
+              {['👍', '😂', '❤️', '😲'].map(emoji => (
+                <button key={emoji} onClick={(e) => { e.stopPropagation(); handleReact(emoji); }} className="hover:scale-125 transition-transform text-base cursor-pointer">
+                  {emoji}
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
