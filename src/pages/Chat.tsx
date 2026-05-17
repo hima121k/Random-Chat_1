@@ -380,51 +380,8 @@ export default function Chat() {
     navigate('/', { state: { autoStart: true } })
   }
 
-  const handleTabClose = useCallback(() => {
-    if (isLeavingRef.current || !chatId || !currentUserId) return
-    isLeavingRef.current = true
 
-    // 1. Local update Doc (best effort if page doesn't close immediately)
-    updateDoc(doc(db, 'chats', chatId), { status: 'ended' }).catch(() => {})
 
-    // 2. Keepalive REST PATCH fetch (guarantees the end status write even during hard tab close!)
-    const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID
-    const token = idTokenRef.current
-    if (projectId && token) {
-      const url = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/chats/${chatId}?updateMask.fieldPaths=status`
-      fetch(url, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          fields: {
-            status: { stringValue: 'ended' }
-          }
-        }),
-        keepalive: true
-      }).catch(() => {})
-    }
-  }, [chatId, currentUserId])
-
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      handleTabClose()
-    }
-
-    const handlePageHide = () => {
-      handleTabClose()
-    }
-
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    window.addEventListener('pagehide', handlePageHide)
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload)
-      window.removeEventListener('pagehide', handlePageHide)
-    }
-  }, [handleTabClose])
 
   const handleConfirmReport = async () => {
     if (!strangerData?.id || !currentUserId || !db || isReporting) return
