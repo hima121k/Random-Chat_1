@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Timestamp, doc, updateDoc, deleteField } from 'firebase/firestore';
 import { db, auth } from '../../lib/firebase';
-import { Check, CheckCheck } from 'lucide-react';
+import { Check, CheckCheck, Reply } from 'lucide-react';
 
 export interface Message {
   id: string;
@@ -10,15 +10,18 @@ export interface Message {
   createdAt: Timestamp | null;
   reactions?: Record<string, string>;
   isRead?: boolean;
+  replyTo?: { text: string; senderId: string } | null;
 }
 
 interface MessageBubbleProps {
   message: Message;
   isOwnMessage: boolean;
   chatId: string;
+  strangerName: string;
+  onReply: (message: Message) => void;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, chatId }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, chatId, strangerName, onReply }) => {
   const [showReactions, setShowReactions] = useState(false);
 
   const currentUserId = auth.currentUser?.uid || '';
@@ -55,6 +58,17 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMess
       onMouseLeave={() => setShowReactions(false)}
       onClick={() => setShowReactions(prev => !prev)}
     >
+      {/* Reply Action Button (visible on hover next to bubble) */}
+      <button 
+        onClick={(e) => { e.stopPropagation(); onReply(message); }}
+        className={`absolute top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity p-2 bg-rc-panel border border-rc-border hover:border-rc-accent/50 rounded-full text-rc-muted hover:text-rc-accentGlow shadow-md z-10 cursor-pointer ${
+          isOwnMessage ? '-left-12' : '-right-12'
+        }`}
+        title="Reply"
+      >
+        <Reply size={14} className={isOwnMessage ? 'scale-x-[-1]' : ''} />
+      </button>
+
       <div
         className={`px-4 py-2.5 rounded-2xl max-w-[78%] shadow-md text-sm leading-relaxed relative ${
           isOwnMessage
@@ -62,6 +76,18 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMess
             : 'bg-rc-panel border border-rc-border text-rc-text rounded-bl-sm'
         }`}
       >
+        {/* Reply Preview inside Bubble */}
+        {message.replyTo && (
+          <div className={`mb-1.5 p-2 rounded-lg border-l-2 text-xs bg-black/10 flex flex-col gap-0.5 ${
+            isOwnMessage ? 'border-white/50 text-white/90' : 'border-rc-accent/50 text-rc-muted'
+          }`}>
+            <span className="font-bold text-[10px] uppercase tracking-wider">
+              {message.replyTo.senderId === currentUserId ? 'You' : strangerName}
+            </span>
+            <span className="truncate">{message.replyTo.text}</span>
+          </div>
+        )}
+
         <div className="break-words">{message.text}</div>
         
         <div className={`flex items-center justify-end gap-1 text-[10px] mt-1 ${isOwnMessage ? 'text-white/50' : 'text-rc-muted'}`}>

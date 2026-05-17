@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, Video, PhoneOff, Phone, Flag, AlertTriangle, Lock, Zap } from 'lucide-react'
+import { ArrowLeft, Video, PhoneOff, Phone, Flag, AlertTriangle, Lock, Zap, X } from 'lucide-react'
 import {
   collection, query, orderBy, onSnapshot, addDoc, serverTimestamp,
   doc, updateDoc, setDoc, onSnapshot as onSnap, Timestamp
@@ -75,6 +75,8 @@ export default function Chat() {
   const [reportSent, setReportSent] = useState(false)
   const [isReporting, setIsReporting] = useState(false)
   const [reportError, setReportError] = useState('')
+
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null)
 
   const isLeavingRef = useRef(false)
   const strangerUnsubRef = useRef<(() => void) | null>(null)
@@ -270,17 +272,35 @@ export default function Chat() {
             updateDoc(doc(db, 'chats', chatId, 'messages', raw.id), { isRead: true }).catch(() => {});
           }
 
+          // Handle decrypting replyTo if it exists
+          let replyTo: { text: string; senderId: string } | null = null
+          const rawReply = anyRaw.replyTo as { text?: string; ct?: string; iv?: string; senderId: string } | undefined
+          if (rawReply) {
+            if (rawReply.ct && rawReply.iv && sharedKeyRef.current) {
+              const decryptedReplyText = await decryptMessage({ ct: rawReply.ct, iv: rawReply.iv }, sharedKeyRef.current)
+              replyTo = {
+                text: decryptedReplyText ?? '🔒 Encrypted message',
+                senderId: rawReply.senderId
+              }
+            } else if (rawReply.text) {
+              replyTo = {
+                text: rawReply.text,
+                senderId: rawReply.senderId
+              }
+            }
+          }
+
           // Support both encrypted (ct/iv) and plaintext (text) message formats
           const hasEncrypted = raw.ct && raw.iv
           if (!hasEncrypted) {
             // Plaintext fallback message
-            return { id: raw.id, text: (anyRaw.text as string) ?? '', senderId: raw.senderId, createdAt: raw.createdAt, reactions, isRead }
+            return { id: raw.id, text: (anyRaw.text as string) ?? '', senderId: raw.senderId, createdAt: raw.createdAt, reactions, isRead, replyTo }
           }
           if (!sharedKeyRef.current)
-            return { id: raw.id, text: '🔒 Decrypting…', senderId: raw.senderId, createdAt: raw.createdAt, reactions, isRead }
+            return { id: raw.id, text: '🔒 Decrypting…', senderId: raw.senderId, createdAt: raw.createdAt, reactions, isRead, replyTo }
           const payload: EncryptedPayload = { ct: raw.ct, iv: raw.iv }
           const plaintext = await decryptMessage(payload, sharedKeyRef.current)
-          return { id: raw.id, text: plaintext ?? '🔒 Encrypted message', senderId: raw.senderId, createdAt: raw.createdAt, reactions, isRead }
+          return { id: raw.id, text: plaintext ?? '🔒 Encrypted message', senderId: raw.senderId, createdAt: raw.createdAt, reactions, isRead, replyTo }
         })
       )
       if (mounted) setMessages(decrypted)                       // Fix #8: guard
@@ -296,20 +316,41 @@ export default function Chat() {
   // ── Send message (encrypted if key ready, plaintext fallback) ────────────
   const handleSendMessage = useCallback(async (text: string) => {
     if (!chatId || !currentUserId || isLeavingRef.current) return
+
+    let replyData: { text?: string; ct?: string; iv?: string; senderId: string } | null = null
+    if (replyingTo) {
+      if (sharedKeyRef.current) {
+        // Encrypt reply text for absolute E2EE privacy!
+        const payload = await encryptMessage(replyingTo.text, sharedKeyRef.current)
+        replyData = {
+          ct: payload.ct,
+          iv: payload.iv,
+          senderId: replyingTo.senderId
+        }
+      } else {
+        // Plaintext fallback
+        replyData = {
+          text: replyingTo.text,
+          senderId: replyingTo.senderId
+        }
+      }
+      setReplyingTo(null)
+    }
+
     if (sharedKeyRef.current) {
       // Full E2EE path
       const payload = await encryptMessage(text, sharedKeyRef.current)
       await addDoc(collection(db, 'chats', chatId, 'messages'), {
-        ct: payload.ct, iv: payload.iv, senderId: currentUserId, createdAt: serverTimestamp()
+        ct: payload.ct, iv: payload.iv, senderId: currentUserId, createdAt: serverTimestamp(), replyTo: replyData
       })
     } else {
       // Plaintext fallback (E2EE setup failed / timed out)
       await addDoc(collection(db, 'chats', chatId, 'messages'), {
-        text, senderId: currentUserId, createdAt: serverTimestamp()
+        text, senderId: currentUserId, createdAt: serverTimestamp(), replyTo: replyData
       })
     }
     await updateDoc(doc(db, 'chats', chatId), { lastMessageAt: serverTimestamp() })
-  }, [chatId, currentUserId])
+  }, [chatId, currentUserId, replyingTo])
 
   const handleTyping = useCallback((isTyping: boolean) => {
     if (!chatId || !currentUserId || isLeavingRef.current) return;
@@ -612,7 +653,14 @@ export default function Chat() {
         )}
 
         {messages.map(msg => (
-          <MessageBubble key={msg.id} message={msg} isOwnMessage={msg.senderId === currentUserId} chatId={chatId!} />
+          <MessageBubble 
+            key={msg.id} 
+            message={msg} 
+            isOwnMessage={msg.senderId === currentUserId} 
+            chatId={chatId!} 
+            strangerName={strangerData?.name || 'Stranger'}
+            onReply={setReplyingTo}
+          />
         ))}
         {peerTyping && (
           <div className="flex justify-start">
@@ -625,6 +673,26 @@ export default function Chat() {
         )}
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Reply Preview Bar */}
+      {replyingTo && (
+        <div className="mx-4 mb-2 bg-rc-panel/85 border border-rc-accent/30 rounded-xl p-3 flex items-center justify-between shadow-glowSm animate-fade-in z-10 backdrop-blur-md">
+          <div className="flex items-start gap-2.5 border-l-2 border-rc-accent pl-3 overflow-hidden">
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-bold text-rc-accentGlow uppercase tracking-wider">
+                Replying to {replyingTo.senderId === currentUserId ? 'yourself' : (strangerData?.name || 'stranger')}
+              </p>
+              <p className="text-xs text-rc-muted truncate mt-0.5">{replyingTo.text}</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => setReplyingTo(null)} 
+            className="p-1.5 hover:bg-rc-surface rounded-full text-rc-muted hover:text-rc-text transition-colors cursor-pointer"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
 
       {/* Input — always enabled; send button shows spinner while E2EE is pending */}
       <ChatInput onSendMessage={handleSendMessage} disabled={false} e2eePending={!e2eeReady} onTyping={handleTyping} />
