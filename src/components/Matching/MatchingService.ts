@@ -30,10 +30,6 @@ export const MatchingService = {
 
   findMatch: async (userId: string, userData: UserData, onMatchFound: (chatId: string) => void): Promise<() => void> => {
     if (!db) throw new Error('Firestore not initialised.');
-    
-    // Cache the exact moment the matching session began
-    const joinTime = Date.now();
-    let queueServerTime: number | null = null;
 
     try {
       // 0. Check if the current user is banned.
@@ -185,56 +181,64 @@ export const MatchingService = {
         // Cache the waiting room document ID for tab-close beacon support!
         MatchingService.activeWaitingDocId = waitingDocRef.id;
 
-        // Watch our own waiting doc — if it still exists and gets deleted it means
-        // we were matched; fall back to the chats listener below.
-        const unsubWaiting = onSnapshot(waitingDocRef, (snapshot) => {
-          if (snapshot.exists()) {
-            const data = snapshot.data();
-            // Cache the server's exact timestamp for this queue entry to prevent clock skew bugs!
-            if (data.createdAt) {
-              queueServerTime = data.createdAt.toDate ? data.createdAt.toDate().getTime() : data.createdAt;
-            }
-          } else {
-            // doc was deleted by the matcher — the chats listener will fire shortly
-            unsubWaiting();
-          }
-        });
+        // Maintain the list of current active chats where we are a participant
+        interface ActiveChatInfo {
+          id: string;
+          createdAt: number;
+        }
+        let latestActiveChats: ActiveChatInfo[] = [];
 
-        // Fix: primary match signal — listen for a new chat where we are a participant
+        // Fix: primary match signal — listen for active chats where we are a participant
         const chatsRef = collection(db, 'chats');
         const chatsQ = query(chatsRef, where('participants', 'array-contains', userId));
-        let chatFound = false;
         
         const unsubChats = onSnapshot(chatsQ, (chatsSnap) => {
-          if (chatFound) return;
-          
-          // Fix: Prevent auto-matching to historical active chats!
-          // We only resolve matches created AFTER our queue session began (with a small 5s clock skew buffer)
-          const newChat = chatsSnap.docs.find(d => {
-            const data = d.data();
-            if (data.status !== 'active') return false;
-            
-            const createdAt = data.createdAt?.toDate ? data.createdAt.toDate().getTime() : data.createdAt;
-            // If the chat has no resolved timestamp yet, it is fresh and new!
-            if (!createdAt) return true;
+          latestActiveChats = chatsSnap.docs
+            .map(d => {
+              const data = d.data();
+              if (data.status !== 'active') return null;
+              
+              const createdAt = data.createdAt
+                ? (data.createdAt.toDate ? data.createdAt.toDate().getTime() : data.createdAt)
+                : Infinity;
+              return { id: d.id, createdAt };
+            })
+            .filter((c): c is ActiveChatInfo => c !== null)
+            .sort((a, b) => b.createdAt - a.createdAt);
+        });
 
-            // If we have the server-confirmed queue entry time, compare using it (perfect sync!)
-            if (queueServerTime) {
-              return createdAt >= (queueServerTime - 5000);
-            }
-            
-            // Fallback: compare against local time with a generous 60-second buffer to absorb any device clock skew
-            return createdAt >= (joinTime - 60000);
-          });
-
-          if (newChat) {
-            chatFound = true;
-            unsubChats();
+        // Watch our own waiting doc — when it gets deleted by the matcher, we are officially matched!
+        let chatFound = false;
+        const unsubWaiting = onSnapshot(waitingDocRef, (snapshot) => {
+          if (!snapshot.exists()) {
             unsubWaiting();
-            // Clean up our waiting room doc in case it wasn't deleted yet
-            MatchingService.activeWaitingDocId = null;
-            deleteDoc(waitingDocRef).catch(() => {});
-            onMatchFound(newChat.id);
+            
+            // The document was deleted, meaning we matched!
+            // Retrieve the newest active chat and transition
+            const handleMatchTransition = (chatId: string) => {
+              if (chatFound) return;
+              chatFound = true;
+              unsubChats();
+              MatchingService.activeWaitingDocId = null;
+              deleteDoc(waitingDocRef).catch(() => {});
+              onMatchFound(chatId);
+            };
+
+            const newestChat = latestActiveChats[0];
+            if (newestChat) {
+              handleMatchTransition(newestChat.id);
+            } else {
+              // Fallback: if the chats snapshot hasn't arrived/updated yet, poll briefly
+              const interval = setInterval(() => {
+                const retryChat = latestActiveChats[0];
+                if (retryChat) {
+                  clearInterval(interval);
+                  handleMatchTransition(retryChat.id);
+                }
+              }, 100);
+              // Safety timeout: stop polling after 5 seconds to prevent memory leaks
+              setTimeout(() => clearInterval(interval), 5000);
+            }
           }
         });
 
