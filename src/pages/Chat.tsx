@@ -560,53 +560,53 @@ export default function Chat() {
             )}
             <div className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-rc-panel rounded-full shadow-glowSm"></div>
           </div>
-          <div>
-            <h2 className="font-semibold text-rc-text flex items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <h2 className="font-semibold text-rc-text flex items-center gap-2 truncate">
               {strangerData?.name || 'Stranger'}
               {(strangerData?.isPro || strangerData?.role === 'owner' || strangerData?.role === 'admin') && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full border uppercase tracking-wider font-bold text-amber-400 bg-amber-500/10 border-amber-500/20 shadow-glowSm flex items-center gap-1">
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full border uppercase tracking-wider font-bold text-amber-400 bg-amber-500/10 border-amber-500/20 shadow-glowSm flex items-center gap-1 shrink-0">
                   <Zap size={8} className="fill-amber-400" /> Pro Member
                 </span>
               )}
               {strangerData?.role === 'owner' && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full border uppercase tracking-wider font-bold text-amber-400 bg-amber-500/10 border-amber-500/20 shadow-glowSm">
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full border uppercase tracking-wider font-bold text-amber-400 bg-amber-500/10 border-amber-500/20 shadow-glowSm shrink-0">
                   👑 System Owner
                 </span>
               )}
               {strangerData?.role === 'admin' && (
-                <span className="text-[9px] px-1.5 py-0.5 rounded-full border uppercase tracking-wider font-bold text-blue-400 bg-blue-500/10 border-blue-500/20 shadow-glowSm">
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full border uppercase tracking-wider font-bold text-blue-400 bg-blue-500/10 border-blue-500/20 shadow-glowSm shrink-0">
                   🛡️ Moderator
                 </span>
               )}
               {strangerData?.gender && !strangerData?.role && (
-                <span className={`text-[9px] px-1.5 py-0.5 rounded-full border uppercase tracking-wider font-bold ${getGenderBadgeColor(strangerData.gender)}`}>
+                <span className={`text-[9px] px-1.5 py-0.5 rounded-full border uppercase tracking-wider font-bold shrink-0 ${getGenderBadgeColor(strangerData.gender)}`}>
                   {strangerData.gender}
                 </span>
               )}
             </h2>
-            <div className="text-[11px] flex items-center gap-1 mt-0.5 text-rc-muted flex-wrap">
+            <div className="text-[10px] flex items-center gap-1.5 mt-0.5 text-rc-muted overflow-x-auto hide-scrollbar flex-nowrap whitespace-nowrap w-full select-none">
               {strangerData?.location && (
-                <span className="hidden sm:inline-flex bg-rc-surface border border-rc-border px-1.5 py-0.5 rounded text-[10px]">📍 {strangerData.location}</span>
+                <span className="bg-rc-surface border border-rc-border px-1.5 py-0.5 rounded text-[9px] shrink-0 whitespace-nowrap">📍 {strangerData.location}</span>
               )}
               {strangerData?.interests && strangerData.interests.split(', ').map((interest, idx) => (
-                <span key={idx} className="hidden sm:inline-flex bg-rc-surface border border-rc-border px-1.5 py-0.5 rounded text-[10px] whitespace-nowrap">✨ {interest}</span>
+                <span key={idx} className="bg-rc-surface border border-rc-border px-1.5 py-0.5 rounded text-[9px] shrink-0 whitespace-nowrap">✨ {interest}</span>
               ))}
               {strangerData?.mood && (
-                <span className="hidden sm:inline-flex bg-rc-surface border border-rc-border px-1.5 py-0.5 rounded text-[10px]">
+                <span className="bg-rc-surface border border-rc-border px-1.5 py-0.5 rounded text-[9px] shrink-0 whitespace-nowrap">
                   {strangerData.mood === 'Chill' && '🍃 '}{strangerData.mood === 'Curious' && '🤔 '}{strangerData.mood === 'Funny' && '😂 '}{strangerData.mood === 'Deep talk' && '🌌 '}{strangerData.mood}
                 </span>
               )}
               
               {isE2eeActive ? (
-                <span className="text-emerald-400 flex items-center gap-1 ml-1 shrink-0">
+                <span className="text-emerald-400 flex items-center gap-1 shrink-0 whitespace-nowrap">
                   <Lock size={9} /> Encrypted
                 </span>
               ) : e2eeReady ? (
-                <span className="text-amber-400 flex items-center gap-1 ml-1 shrink-0">
+                <span className="text-amber-400 flex items-center gap-1 shrink-0 whitespace-nowrap">
                   <Lock size={9} /> Unencrypted
                 </span>
               ) : (
-                <span className="text-yellow-400 flex items-center gap-1 ml-1 shrink-0">
+                <span className="text-yellow-400 flex items-center gap-1 shrink-0 whitespace-nowrap">
                   <Lock size={9} /> Setting up...
                 </span>
               )}
