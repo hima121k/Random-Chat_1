@@ -7,10 +7,9 @@ const db = admin.firestore();
 
 // STRIPE_SECRET_KEY and STRIPE_WEBHOOK_SECRET should be set in Firebase Config or environment
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2025-01-27.acacia' as any,
+  apiVersion: '2025-01-27.acacia' as unknown as Stripe.StripeConfig['apiVersion'],
 });
 
-const REPORT_THRESHOLD = 3;
 
 /**
  * Auto-ban Cloud Function
@@ -42,9 +41,10 @@ export const stripeWebhook = functions.https.onRequest(async (req, res) => {
 
   try {
     event = stripe.webhooks.constructEvent(req.rawBody, sig, endpointSecret);
-  } catch (err: any) {
-    functions.logger.error('Webhook signature verification failed.', err.message);
-    res.status(400).send(`Webhook Error: ${err.message}`);
+  } catch (err: unknown) {
+    const error = err as Error;
+    functions.logger.error('Webhook signature verification failed.', error.message);
+    res.status(400).send(`Webhook Error: ${error.message}`);
     return;
   }
 

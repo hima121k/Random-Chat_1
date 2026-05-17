@@ -35,13 +35,13 @@ export function LocalAvatarCreator({ onAvatarExported, onClose }: LocalAvatarCre
   const [customAvatarUri, setCustomAvatarUri] = useState<string | null>(null);
 
   const generatedAvatarUri = useMemo(() => {
-    const options: any = { seed };
+    const options: Record<string, string[] | string> = { seed };
     if (backgroundColor !== 'transparent') {
       options.backgroundColor = [backgroundColor];
     } else {
       options.backgroundColor = ['b6e3f400']; // Transparent hex
     }
-    const avatar = createAvatar(activeStyle.module as any, options);
+    const avatar = createAvatar(activeStyle.module as Parameters<typeof createAvatar>[0], options);
     return avatar.toDataUri();
   }, [activeStyle, seed, backgroundColor]);
 

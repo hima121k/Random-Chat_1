@@ -268,7 +268,10 @@ export default function Home() {
   useEffect(() => {
     if (location.state?.autoStart && name.trim()) {
       navigate('/', { replace: true, state: {} })
-      handleStart()
+      const timer = setTimeout(() => {
+        handleStart()
+      }, 0)
+      return () => clearTimeout(timer)
     }
   }, [location.state, navigate, handleStart, name])
 
@@ -353,8 +356,8 @@ export default function Home() {
                       appealMsg.trim()
                     )
                     setAppealSent(true)
-                  } catch (e: any) {
-                    const msg = e?.message || ''
+                  } catch (e: unknown) {
+                    const msg = (e as { message?: string })?.message || ''
                     if (msg.startsWith('APPEAL_EXISTS:')) setAppealError('You already have a pending appeal.')
                     else setAppealError('Failed to submit. Please try again.')
                   } finally { setIsAppealing(false) }

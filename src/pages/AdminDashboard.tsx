@@ -114,7 +114,7 @@ export default function AdminDashboard() {
     try {
       await actionReportBan(report.id, report.reportedId, report.reportedName, report.reportedEmail || '', permanent);
       showMsg(`${report.reportedName} has been banned.`);
-    } catch (err: any) { showMsg(err.message || 'Failed', true); }
+    } catch (err: unknown) { showMsg((err as Error).message || 'Failed', true); }
   };
 
   // ── Manual ban ──
@@ -126,7 +126,7 @@ export default function AdminDashboard() {
       await manualBanUser(banUserId.trim(), banEmail.trim(), banName.trim(), banReason.trim(), banPermanent);
       showMsg(`User banned successfully.`);
       setBanUserId(''); setBanEmail(''); setBanName(''); setBanReason(''); setBanPermanent(false);
-    } catch (err: any) { showMsg(err.message || 'Failed', true); }
+    } catch (err: unknown) { showMsg((err as Error).message || 'Failed', true); }
     finally { setIsLoading(false); }
   };
 
@@ -145,7 +145,7 @@ export default function AdminDashboard() {
     try {
       const count = await clearAllReports();
       showMsg(`Deleted ${count} report(s) successfully.`);
-    } catch (err: any) { showMsg(err.message || 'Failed', true); }
+    } catch (err: unknown) { showMsg((err as Error).message || 'Failed', true); }
     finally { setIsLoading(false); }
   };
 
@@ -162,7 +162,7 @@ export default function AdminDashboard() {
     try {
       const count = await deleteAllReportsForUser(uid);
       showMsg(`Deleted ${count} report(s) for ${name}.`);
-    } catch (err: any) { showMsg(err.message || 'Failed', true); }
+    } catch (err: unknown) { showMsg((err as Error).message || 'Failed', true); }
   };
 
   // ── Admin management ──
@@ -464,11 +464,11 @@ export default function AdminDashboard() {
                             {uniqueReporters} <span className="text-xs font-normal opacity-50">({group.reports.length} total)</span>
                           </span>
                           <button
-                            onClick={async () => { if (!confirm(`Temp ban (7d) ${group.name}?`)) return; try { await manualBanUser(uid, group.email, group.name, 'Banned via All Reports', false); showMsg(`${group.name} temp-banned.`); } catch(e: any) { showMsg(e.message, true); } }}
+                            onClick={async () => { if (!confirm(`Temp ban (7d) ${group.name}?`)) return; try { await manualBanUser(uid, group.email, group.name, 'Banned via All Reports', false); showMsg(`${group.name} temp-banned.`); } catch(e: unknown) { showMsg((e as Error).message, true); } }}
                             className="text-[11px] px-2.5 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg transition-colors"
                           >⏱ Temp Ban</button>
                           <button
-                            onClick={async () => { if (!confirm(`Permanently ban ${group.name}?`)) return; try { await manualBanUser(uid, group.email, group.name, 'Permanently banned via All Reports', true); showMsg(`${group.name} permanently banned.`); } catch(e: any) { showMsg(e.message, true); } }}
+                            onClick={async () => { if (!confirm(`Permanently ban ${group.name}?`)) return; try { await manualBanUser(uid, group.email, group.name, 'Permanently banned via All Reports', true); showMsg(`${group.name} permanently banned.`); } catch(e: unknown) { showMsg((e as Error).message, true); } }}
                             className="text-[11px] px-2.5 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg transition-colors"
                           >🚫 Perm Ban</button>
                           {role === 'owner' && (
@@ -604,7 +604,7 @@ export default function AdminDashboard() {
                       return (
                         <div className="flex gap-2 pt-1">
                           <button
-                            onClick={async () => { if (!confirm(`Approve appeal & unban ${appeal.name}?`)) return; try { await approveAppeal(appeal.id, appeal.userId); showMsg(`${appeal.name} has been unbanned.`); } catch(e: any) { showMsg(e.message, true); } }}
+                            onClick={async () => { if (!confirm(`Approve appeal & unban ${appeal.name}?`)) return; try { await approveAppeal(appeal.id, appeal.userId); showMsg(`${appeal.name} has been unbanned.`); } catch(e: unknown) { showMsg((e as Error).message, true); } }}
                             disabled={isRestricted}
                             title={isRestricted ? "Only an Owner can approve appeals for users banned by an Owner" : ""}
                             className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-green-500/10 hover:bg-green-500/20 text-green-400 border border-green-500/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
@@ -613,7 +613,7 @@ export default function AdminDashboard() {
                             Approve & Unban
                           </button>
                           <button
-                            onClick={async () => { if (!confirm(`Deny appeal for ${appeal.name}?`)) return; try { await denyAppeal(appeal.id); showMsg(`Appeal denied.`); } catch(e: any) { showMsg(e.message, true); } }}
+                            onClick={async () => { if (!confirm(`Deny appeal for ${appeal.name}?`)) return; try { await denyAppeal(appeal.id); showMsg(`Appeal denied.`); } catch(e: unknown) { showMsg((e as Error).message, true); } }}
                             className="flex items-center gap-1.5 text-xs px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 rounded-lg transition-colors"
                           ><XCircle size={12} /> Deny</button>
                         </div>

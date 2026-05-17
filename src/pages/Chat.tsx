@@ -34,6 +34,8 @@ interface Message {
   text: string;
   senderId: string;
   createdAt: Timestamp | null;
+  reactions?: string[];
+  isRead?: boolean;
 }
 
 interface RawMessage {
@@ -44,8 +46,7 @@ interface RawMessage {
   createdAt: Timestamp | null;
 }
 
-// Track the current chat session to detect transitions
-let lastNavigatedChatId: string | null = null;
+
 
 export default function Chat() {
   const { chatId } = useParams<{ chatId: string }>()
@@ -345,8 +346,8 @@ export default function Chat() {
         localStorage.setItem('blockedUsers', JSON.stringify([...blocked, strangerData.id]))
       setReportSent(true)
       setTimeout(() => { handleSwap() }, 1500)
-    } catch (e: any) {
-      const msg = e?.message || ''
+    } catch (e: unknown) {
+      const msg = (e as { message?: string })?.message || ''
       if (msg.startsWith('ALREADY_REPORTED:')) {
         setReportError('You have already reported this person in this session.')
       } else {
@@ -611,7 +612,7 @@ export default function Chat() {
         )}
 
         {messages.map(msg => (
-          <MessageBubble key={msg.id} message={msg} isOwnMessage={msg.senderId === currentUserId} chatId={chatId} />
+          <MessageBubble key={msg.id} message={msg} isOwnMessage={msg.senderId === currentUserId} chatId={chatId!} />
         ))}
         {peerTyping && (
           <div className="flex justify-start">

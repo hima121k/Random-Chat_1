@@ -12,10 +12,9 @@ interface ChatInputProps {
 export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, e2eePending, onTyping }) => {
   const [text, setText] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const [typingTimeout, setTypingTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [typingTimeout, setTypingTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const emojiPickerRef = useRef<HTMLDivElement>(null); // Fix #9: ref for click-outside
 
   const MAX_LENGTH = 2000;           // Fix #12
   const WARN_AT   = 1800;           // Fix #12: show countdown from here
@@ -24,10 +23,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, e
     inputRef.current?.focus();
   }, []);
 
-  // Close emoji picker using a backdrop instead of document listeners
-  useEffect(() => {
-    // Intentionally left empty, cleanup removed
-  }, []);
 
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
