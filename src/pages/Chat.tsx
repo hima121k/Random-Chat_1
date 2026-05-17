@@ -544,13 +544,14 @@ export default function Chat() {
 
       {/* Header */}
       <header className="relative z-10 bg-rc-panel/95 backdrop-blur-xl border-b border-rc-border py-2 px-3 sm:py-3 sm:px-4 flex flex-col gap-2 sm:flex-row sm:items-center shadow-lg">
-        {/* Row 1: Left avatar/name, Right actions */}
+        {/* Main Header Line (Always active, behaves like original layout on desktop) */}
         <div className="flex items-center w-full sm:w-auto flex-1 min-w-0">
-          <button onClick={handleLeave} className="mr-2 p-1.5 hover:bg-rc-surface rounded-xl transition-colors text-rc-muted hover:text-rc-text shrink-0">
-            <ArrowLeft size={20} />
+          <button onClick={handleLeave} className="mr-2 sm:mr-3 p-1.5 sm:p-2 hover:bg-rc-surface rounded-xl transition-colors text-rc-muted hover:text-rc-text shrink-0">
+            <ArrowLeft size={20} className="sm:hidden" />
+            <ArrowLeft size={22} className="hidden sm:block" />
           </button>
           
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
             {/* Avatar */}
             <div className="relative shrink-0">
               {strangerData?.avatarUrl ? (
@@ -562,16 +563,26 @@ export default function Chat() {
                   </span>
                 </div>
               )}
-              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-emerald-500 border-2 border-rc-panel rounded-full shadow-glowSm"></div>
+              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 sm:w-3 sm:h-3 bg-emerald-500 border-2 border-rc-panel rounded-full shadow-glowSm"></div>
             </div>
 
-            {/* Name & Badges */}
+            {/* Stranger Details Column */}
             <div className="min-w-0 flex-1">
-              <h2 className="font-semibold text-rc-text flex flex-wrap items-center gap-1.5 text-sm sm:text-base">
+              <h2 className="font-semibold text-rc-text flex flex-wrap sm:flex-nowrap items-center gap-1.5 sm:gap-2 text-sm sm:text-base truncate">
                 <span className="truncate max-w-[80px] xs:max-w-[120px] sm:max-w-none">{strangerData?.name || 'Stranger'}</span>
                 {(strangerData?.isPro || strangerData?.role === 'owner' || strangerData?.role === 'admin') && (
                   <span className="text-[8px] sm:text-[9px] px-1.5 py-0.5 rounded-full border uppercase tracking-wider font-bold text-amber-400 bg-amber-500/10 border-amber-500/20 shadow-glowSm flex items-center gap-0.5 shrink-0">
-                    <Zap size={7} className="fill-amber-400" /> Pro
+                    <Zap size={7} className="fill-amber-400 sm:w-2 sm:h-2" /> Pro Member
+                  </span>
+                )}
+                {strangerData?.role === 'owner' && (
+                  <span className="text-[8px] sm:text-[9px] px-1.5 py-0.5 rounded-full border uppercase tracking-wider font-bold text-amber-400 bg-amber-500/10 border-amber-500/20 shadow-glowSm shrink-0">
+                    👑 System Owner
+                  </span>
+                )}
+                {strangerData?.role === 'admin' && (
+                  <span className="text-[8px] sm:text-[9px] px-1.5 py-0.5 rounded-full border uppercase tracking-wider font-bold text-blue-400 bg-blue-500/10 border-blue-500/20 shadow-glowSm shrink-0">
+                    🛡️ Moderator
                   </span>
                 )}
                 {strangerData?.gender && !strangerData?.role && (
@@ -580,7 +591,41 @@ export default function Chat() {
                   </span>
                 )}
               </h2>
-              {/* E2EE / Status text for Row 1 on mobile */}
+
+              {/* 💻 Laptop-only Tags List (Rendered directly below the name, matching original desktop view!) */}
+              <div className="hidden sm:flex text-[10px] items-center gap-2 mt-1 text-rc-muted flex-wrap">
+                {strangerData?.location && (
+                  <span className="bg-blue-500/10 border border-blue-500/20 text-blue-300 px-2.5 py-0.5 rounded-full text-[9px] shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm transition-all duration-300 hover:bg-blue-500/20">
+                    📍 {strangerData.location}
+                  </span>
+                )}
+                {strangerData?.interests && strangerData.interests.split(', ').map((interest, idx) => (
+                  <span key={idx} className="bg-rc-accent/10 border border-rc-accent/20 text-rc-accentGlow px-2.5 py-0.5 rounded-full text-[9px] shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm transition-all duration-300 hover:bg-rc-accent/20">
+                    ✨ {interest}
+                  </span>
+                ))}
+                {strangerData?.mood && (
+                  <span className="bg-violet-500/10 border border-violet-500/20 text-violet-300 px-2.5 py-0.5 rounded-full text-[9px] shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm transition-all duration-300 hover:bg-violet-500/20">
+                    {strangerData.mood === 'Chill' && '🍃 '}{strangerData.mood === 'Curious' && '🤔 '}{strangerData.mood === 'Funny' && '😂 '}{strangerData.mood === 'Deep talk' && '🌌 '}{strangerData.mood}
+                  </span>
+                )}
+                
+                {isE2eeActive ? (
+                  <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2.5 py-0.5 rounded-full text-[9px] font-semibold shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm transition-all duration-300 animate-pulse-slow">
+                    <Lock size={9} /> Encrypted
+                  </span>
+                ) : e2eeReady ? (
+                  <span className="bg-amber-500/10 border border-amber-500/20 text-amber-400 px-2.5 py-0.5 rounded-full text-[9px] font-semibold shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm">
+                    <Lock size={9} /> Unencrypted
+                  </span>
+                ) : (
+                  <span className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 px-2.5 py-0.5 rounded-full text-[9px] font-semibold shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm animate-pulse">
+                    <Lock size={9} /> Setting up...
+                  </span>
+                )}
+              </div>
+
+              {/* 📱 Mobile-only E2EE Status Text (Displayed under Name on mobile) */}
               <div className="flex sm:hidden items-center text-[10px] mt-0.5">
                 {isE2eeActive ? (
                   <span className="text-emerald-400 flex items-center gap-0.5 font-medium">
@@ -599,7 +644,7 @@ export default function Chat() {
             </div>
           </div>
 
-          {/* Action buttons (rendered next to name on mobile) */}
+          {/* 📱 Mobile-only action buttons */}
           <div className="flex items-center gap-1 ml-auto sm:hidden shrink-0">
             <button onClick={handleStartCall} disabled={inCall || incomingCall}
               className="p-1.5 hover:bg-rc-surface rounded-xl transition-colors text-rc-muted hover:text-rc-accentGlow disabled:opacity-40">
@@ -616,9 +661,8 @@ export default function Chat() {
           </div>
         </div>
 
-        {/* Row 2: Tags list (Location, Interests, Mood, E2EE status).
-            On mobile, it spans full width. On desktop, it resides next to the name. */}
-        <div className="text-[10px] flex items-center gap-2 text-rc-muted overflow-x-auto hide-scrollbar flex-nowrap whitespace-nowrap w-full sm:w-auto py-0.5 select-none sm:ml-12">
+        {/* 📱 Mobile-only Tags Row (Full width underneath Row 1, hidden on laptop!) */}
+        <div className="sm:hidden text-[10px] flex items-center gap-2 text-rc-muted overflow-x-auto hide-scrollbar flex-nowrap whitespace-nowrap w-full py-0.5 select-none">
           {strangerData?.location && (
             <span className="bg-blue-500/10 border border-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full text-[9px] shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm transition-all duration-300 hover:bg-blue-500/20">
               📍 {strangerData.location}
@@ -634,26 +678,9 @@ export default function Chat() {
               {strangerData.mood === 'Chill' && '🍃 '}{strangerData.mood === 'Curious' && '🤔 '}{strangerData.mood === 'Funny' && '😂 '}{strangerData.mood === 'Deep talk' && '🌌 '}{strangerData.mood}
             </span>
           )}
-          
-          {/* Only render E2EE badge on desktop tags row since it's already on Row 1 on mobile */}
-          <span className="hidden sm:inline-flex">
-            {isE2eeActive ? (
-              <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-2.5 py-0.5 rounded-full text-[9px] font-semibold shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm transition-all duration-300 animate-pulse-slow">
-                <Lock size={9} /> Encrypted
-              </span>
-            ) : e2eeReady ? (
-              <span className="bg-amber-500/10 border border-amber-500/20 text-amber-400 px-2.5 py-0.5 rounded-full text-[9px] font-semibold shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm">
-                <Lock size={9} /> Unencrypted
-              </span>
-            ) : (
-              <span className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-400 px-2.5 py-0.5 rounded-full text-[9px] font-semibold shrink-0 whitespace-nowrap flex items-center gap-1 shadow-glowSm animate-pulse">
-                <Lock size={9} /> Setting up...
-              </span>
-            )}
-          </span>
         </div>
 
-        {/* Desktop Actions Row */}
+        {/* 💻 Laptop-only Action Buttons Row (Far right) */}
         <div className="hidden sm:flex items-center gap-1 shrink-0 ml-auto">
           <button onClick={handleStartCall} disabled={inCall || incomingCall}
             className="p-2 mr-1 hover:bg-rc-surface rounded-xl transition-colors text-rc-muted hover:text-rc-accentGlow disabled:opacity-40">
