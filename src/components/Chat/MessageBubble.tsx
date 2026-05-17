@@ -103,9 +103,23 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMess
 
         {/* Existing Reactions */}
         {message.reactions && Object.keys(message.reactions).length > 0 && (
-          <div className={`absolute -bottom-3 ${isOwnMessage ? 'right-2' : 'left-2'} bg-rc-panel/90 backdrop-blur-md border border-rc-border rounded-full px-2 py-0.5 text-[10px] shadow-md flex items-center gap-1 z-10`}>
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className={`absolute -bottom-3 ${isOwnMessage ? 'right-2' : 'left-2'} bg-rc-panel/90 backdrop-blur-md border border-rc-border rounded-full px-2 py-0.5 text-[10px] shadow-md flex items-center gap-1 z-10`}
+          >
             {Object.entries(message.reactions).map(([uid, emoji]) => (
-              <span key={uid} className="flex items-center gap-1 bg-rc-surface/60 px-1.5 py-0.5 rounded-full border border-rc-border/40">
+              <span 
+                key={uid} 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (uid === currentUserId) {
+                    handleReact(emoji); // Toggles off your reaction!
+                  }
+                }}
+                className={`flex items-center gap-1 bg-rc-surface/60 px-1.5 py-0.5 rounded-full border border-rc-border/40 ${
+                  uid === currentUserId ? 'cursor-pointer hover:bg-rc-accent/15 hover:border-rc-accent/30' : ''
+                }`}
+              >
                 <span className="text-[11px] leading-none">{emoji}</span>
                 <span className="text-[8px] font-bold text-rc-muted uppercase tracking-wider leading-none">
                   {uid === currentUserId ? 'You' : strangerName}
