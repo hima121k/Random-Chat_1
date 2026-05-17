@@ -7,9 +7,10 @@ interface ChatInputProps {
   disabled?: boolean;
   e2eePending?: boolean;
   onTyping?: (isTyping: boolean) => void;
+  hasActiveReply?: boolean;
 }
 
-export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, e2eePending, onTyping }) => {
+export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, e2eePending, onTyping, hasActiveReply }) => {
   const [text, setText] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [typingTimeout, setTypingTimeout] = useState<ReturnType<typeof setTimeout> | null>(null);
@@ -58,7 +59,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, e
   return (
     <footer className="relative z-20 bg-rc-panel/95 backdrop-blur-xl border-t border-rc-border p-3 flex items-center gap-2 mt-auto">
       {/* Quick replies */}
-      {!text && !disabled && (
+      {!text && !disabled && !hasActiveReply && (
         <div className="absolute -top-12 left-0 w-full flex gap-2 px-3 overflow-x-auto hide-scrollbar z-10 pb-2">
           {['Hey! 👋', 'Where are you from? 🌍', 'What\'s your vibe? ✨', 'Got any hobbies? 🎸'].map(qr => (
             <button key={qr} type="button" 

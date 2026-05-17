@@ -65,16 +65,16 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMess
             : 'bg-rc-panel border border-rc-border text-rc-text rounded-bl-sm'
         }`}
       >
-        {/* Reply Action Button (positioned relative to the message bubble itself!) */}
-        <button 
-          onClick={(e) => { e.stopPropagation(); onReply(message); setShowReactions(false); }}
-          className={`absolute top-1/2 -translate-y-1/2 transition-opacity p-2 bg-rc-panel border border-rc-border hover:border-rc-accent/50 rounded-full text-rc-muted hover:text-rc-accentGlow shadow-md z-10 cursor-pointer ${
-            isOwnMessage ? '-left-12' : '-right-12'
-          } ${showReactions ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
-          title="Reply"
-        >
-          <Reply size={14} className={isOwnMessage ? 'scale-x-[-1]' : ''} />
-        </button>
+        {/* Reply Action Button (positioned relative to the message bubble itself, only for stranger messages!) */}
+        {!isOwnMessage && (
+          <button 
+            onClick={(e) => { e.stopPropagation(); onReply(message); setShowReactions(false); }}
+            className={`absolute top-1/2 -translate-y-1/2 transition-opacity p-2 bg-rc-panel border border-rc-border hover:border-rc-accent/50 rounded-full text-rc-muted hover:text-rc-accentGlow shadow-md z-10 cursor-pointer -right-12 ${showReactions ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
+            title="Reply"
+          >
+            <Reply size={14} />
+          </button>
+        )}
         {/* Reply Preview inside Bubble */}
         {message.replyTo && (
           <div className={`mb-1.5 p-2 rounded-lg border-l-2 text-xs bg-black/10 flex flex-col gap-0.5 ${

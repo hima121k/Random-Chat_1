@@ -697,7 +697,7 @@ export default function Chat() {
       )}
 
       {/* Input — always enabled; send button shows spinner while E2EE is pending */}
-      <ChatInput onSendMessage={handleSendMessage} disabled={false} e2eePending={!e2eeReady} onTyping={handleTyping} />
+      <ChatInput onSendMessage={handleSendMessage} disabled={false} e2eePending={!e2eeReady} onTyping={handleTyping} hasActiveReply={!!replyingTo} />
     </div>
   )
 }
