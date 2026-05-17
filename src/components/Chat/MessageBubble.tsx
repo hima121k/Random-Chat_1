@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Timestamp, doc, updateDoc, deleteField } from 'firebase/firestore';
-import { db, auth } from '../../lib/firebase';
+import { db } from '../../lib/firebase';
 import { Check, CheckCheck, Reply } from 'lucide-react';
 
 export interface Message {
@@ -19,12 +19,11 @@ interface MessageBubbleProps {
   chatId: string;
   strangerName: string;
   onReply: (message: Message) => void;
+  currentUserId: string;
 }
 
-export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, chatId, strangerName, onReply }) => {
+export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMessage, chatId, strangerName, onReply, currentUserId }) => {
   const [showReactions, setShowReactions] = useState(false);
-
-  const currentUserId = auth.currentUser?.uid || '';
 
   const timeString = message.createdAt?.toDate
     ? message.createdAt.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
@@ -53,7 +52,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({ message, isOwnMess
 
   return (
     <div 
-      className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} group relative mb-2`}
+      className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} group relative ${
+        message.reactions && Object.keys(message.reactions).length > 0 ? 'mb-4' : 'mb-2'
+      }`}
       onMouseEnter={() => setShowReactions(true)}
       onMouseLeave={() => setShowReactions(false)}
       onClick={() => setShowReactions(prev => !prev)}

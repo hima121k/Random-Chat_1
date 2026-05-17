@@ -662,6 +662,7 @@ export default function Chat() {
             chatId={chatId!} 
             strangerName={strangerData?.name || 'Stranger'}
             onReply={setReplyingTo}
+            currentUserId={currentUserId || ''}
           />
         ))}
         {peerTyping && (
