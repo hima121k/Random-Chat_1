@@ -630,6 +630,8 @@ export default function Chat() {
 
       {/* Chat Area */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3 relative z-10">
+        {/* Top spacer to ensure reaction menus on the first message are never clipped at the top of scroll view */}
+        <div className="h-8 shrink-0"></div>
         <div className="text-center my-4">
           <span className="text-xs text-rc-muted bg-rc-surface/60 border border-rc-border py-1 px-4 rounded-full">
             You are now chatting with a stranger
