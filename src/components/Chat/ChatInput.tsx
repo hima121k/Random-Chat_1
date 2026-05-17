@@ -57,10 +57,10 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, e
   };
 
   return (
-    <footer className="relative z-20 bg-rc-panel/95 backdrop-blur-xl border-t border-rc-border p-3 flex items-center gap-2 mt-auto">
-      {/* Quick replies */}
+    <footer className="relative z-20 bg-rc-panel/95 backdrop-blur-xl border-t border-rc-border p-3 flex flex-col gap-2.5 mt-auto">
+      {/* Quick replies - now a normal block element inside the footer flow, not absolute! */}
       {!text && !disabled && !hasActiveReply && (
-        <div className="absolute -top-12 left-0 w-full flex gap-2 px-3 overflow-x-auto hide-scrollbar z-10 pb-2">
+        <div className="w-full flex gap-2 overflow-x-auto hide-scrollbar pb-1">
           {['Hey! 👋', 'Where are you from? 🌍', 'What\'s your vibe? ✨', 'Got any hobbies? 🎸'].map(qr => (
             <button key={qr} type="button" 
               onClick={() => { 
@@ -68,89 +68,93 @@ export const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, disabled, e
                 inputRef.current?.focus(); 
                 setShowEmojiPicker(false);
               }}
-              className="px-3 py-1.5 bg-rc-panel/95 backdrop-blur-md border border-rc-border rounded-full text-[11px] font-medium text-rc-text hover:bg-rc-surface transition-colors whitespace-nowrap shadow-sm shrink-0">
+              className="px-3 py-1.5 bg-rc-surface/90 hover:bg-rc-surface border border-rc-border rounded-full text-[11px] font-medium text-rc-text transition-colors whitespace-nowrap shadow-sm shrink-0 cursor-pointer">
               {qr}
             </button>
           ))}
         </div>
       )}
-      {showEmojiPicker && (
-        <>
-          <div 
-            className="fixed inset-0 z-40" 
-            onClick={() => setShowEmojiPicker(false)}
-            onTouchStart={() => setShowEmojiPicker(false)}
-          />
-          <div className="absolute bottom-[72px] left-2 z-50 shadow-2xl rounded-2xl overflow-hidden">
-            <EmojiPicker
-              onEmojiClick={onEmojiClick}
-              theme={Theme.DARK}
-              searchDisabled={false}
-              skinTonesDisabled={true}
+
+      {/* Main Row */}
+      <div className="w-full flex items-center gap-2">
+        {showEmojiPicker && (
+          <>
+            <div 
+              className="fixed inset-0 z-40" 
+              onClick={() => setShowEmojiPicker(false)}
+              onTouchStart={() => setShowEmojiPicker(false)}
             />
-          </div>
-        </>
-      )}
-
-      {/* Emoji button */}
-      <button
-        type="button"
-        onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-        disabled={disabled}
-        className={`p-2.5 rounded-xl transition-all disabled:opacity-40 ${
-          showEmojiPicker
-            ? 'bg-rc-accent/20 text-rc-accentGlow'
-            : 'bg-rc-surface text-rc-muted hover:bg-rc-surface/80 hover:text-rc-text'
-        }`}
-        title="Choose an emoji"
-      >
-        <Smile size={20} />
-      </button>
-
-      {/* Input form */}
-      <form onSubmit={handleSend} className="flex-1 flex gap-2 items-center">
-        <div className="flex-1 bg-rc-bg/80 border border-rc-border rounded-2xl px-4 py-2.5 flex items-center focus-within:border-rc-accent/60 focus-within:ring-1 focus-within:ring-rc-accent/20 transition-all">
-          <input
-            ref={inputRef}
-            type="text"
-            value={text}
-            onChange={handleChange}
-            onFocus={() => setShowEmojiPicker(false)}
-            placeholder={disabled ? 'Chat ended' : 'Say something real...'}
-            className="w-full bg-transparent outline-none text-rc-text placeholder-rc-muted text-sm"
-            disabled={disabled || isSending}
-            autoComplete="off"
-            maxLength={MAX_LENGTH}   /* Fix #12 */
-          />
-        </div>
-        {/* Fix #12: character counter */}
-        {text.length >= WARN_AT && (
-          <span className={`text-[10px] shrink-0 tabular-nums ${
-            text.length >= MAX_LENGTH ? 'text-red-400' : 'text-rc-muted'
-          }`}>
-            {MAX_LENGTH - text.length}
-          </span>
+            <div className="absolute bottom-[72px] left-2 z-50 shadow-2xl rounded-2xl overflow-hidden">
+              <EmojiPicker
+                onEmojiClick={onEmojiClick}
+                theme={Theme.DARK}
+                searchDisabled={false}
+                skinTonesDisabled={true}
+              />
+            </div>
+          </>
         )}
 
-        {/* Send button */}
+        {/* Emoji button */}
         <button
-          type="submit"
-          disabled={!text.trim() || isSending || disabled}
-          className="p-2.5 bg-gradient-to-br from-rc-accent to-rose-600 hover:from-rc-accentLt hover:to-rose-500
-                     text-white rounded-2xl transition-all shadow-glowSm
-                     disabled:opacity-40 disabled:shadow-none disabled:hover:from-rc-accent disabled:hover:to-rose-600
-                     active:scale-95 shrink-0"
-          title={e2eePending ? 'Setting up encryption…' : 'Send'}
+          type="button"
+          onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+          disabled={disabled}
+          className={`p-2.5 rounded-xl transition-all disabled:opacity-40 shrink-0 ${
+            showEmojiPicker
+              ? 'bg-rc-accent/20 text-rc-accentGlow'
+              : 'bg-rc-surface text-rc-muted hover:bg-rc-surface/80 hover:text-rc-text'
+          }`}
+          title="Choose an emoji"
         >
-          {isSending ? (
-            <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-          ) : e2eePending ? (
-            <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-          ) : (
-            <Send size={18} strokeWidth={2.5} />
-          )}
+          <Smile size={20} />
         </button>
-      </form>
+
+        {/* Input form */}
+        <form onSubmit={handleSend} className="flex-1 flex gap-2 items-center">
+          <div className="flex-1 bg-rc-bg/80 border border-rc-border rounded-2xl px-4 py-2.5 flex items-center focus-within:border-rc-accent/60 focus-within:ring-1 focus-within:ring-rc-accent/20 transition-all">
+            <input
+              ref={inputRef}
+              type="text"
+              value={text}
+              onChange={handleChange}
+              onFocus={() => setShowEmojiPicker(false)}
+              placeholder={disabled ? 'Chat ended' : 'Say something real...'}
+              className="w-full bg-transparent outline-none text-rc-text placeholder-rc-muted text-sm"
+              disabled={disabled || isSending}
+              autoComplete="off"
+              maxLength={MAX_LENGTH}   /* Fix #12 */
+            />
+          </div>
+          {/* Fix #12: character counter */}
+          {text.length >= WARN_AT && (
+            <span className={`text-[10px] shrink-0 tabular-nums ${
+              text.length >= MAX_LENGTH ? 'text-red-400' : 'text-rc-muted'
+            }`}>
+              {MAX_LENGTH - text.length}
+            </span>
+          )}
+
+          {/* Send button */}
+          <button
+            type="submit"
+            disabled={!text.trim() || isSending || disabled}
+            className="p-2.5 bg-gradient-to-br from-rc-accent to-rose-600 hover:from-rc-accentLt hover:to-rose-500
+                       text-white rounded-2xl transition-all shadow-glowSm
+                       disabled:opacity-40 disabled:shadow-none disabled:hover:from-rc-accent disabled:hover:to-rose-600
+                       active:scale-95 shrink-0"
+            title={e2eePending ? 'Setting up encryption…' : 'Send'}
+          >
+            {isSending ? (
+              <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            ) : e2eePending ? (
+              <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            ) : (
+              <Send size={18} strokeWidth={2.5} />
+            )}
+          </button>
+        </form>
+      </div>
     </footer>
   );
 };
